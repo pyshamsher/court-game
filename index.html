@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pickleball Court Tracker</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, sans-serif; background: #1a1a2e; color: #eee; min-height: 100vh; padding: 20px; }
+  h1 { text-align: center; margin-bottom: 20px; color: #e94560; }
+  #setup, #game { max-width: 800px; margin: 0 auto; }
+  #game { display: none; }
+  .setup-form { background: #16213e; padding: 20px; border-radius: 12px; }
+  .setup-form label { display: block; margin-bottom: 6px; font-weight: 600; }
+  .setup-form textarea { width: 100%; height: 120px; padding: 10px; border-radius: 8px; border: none; font-size: 14px; background: #0f3460; color: #eee; resize: vertical; }
+  .setup-form small { color: #aaa; }
+  button { background: #e94560; color: #fff; border: none; padding: 10px 24px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; margin-top: 12px; }
+  button:hover { background: #c73650; }
+  .court { background: #16213e; border-radius: 12px; padding: 16px; margin-bottom: 20px; }
+  .court h2 { color: #e94560; margin-bottom: 12px; font-size: 18px; }
+  .matchups { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 12px; }
+  .match { background: #0f3460; border-radius: 8px; padding: 12px; flex: 1; min-width: 200px; }
+  .match .vs { text-align: center; color: #e94560; font-weight: 700; margin: 4px 0; }
+  .match .team { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; }
+  .match .team .seed { color: #aaa; font-size: 12px; margin-right: 8px; }
+  .match .team .name { font-weight: 600; }
+  .match button { width: 100%; margin-top: 8px; padding: 8px; font-size: 13px; }
+  .players-list { display: flex; gap: 8px; flex-wrap: wrap; }
+  .players-list .player { background: #0f3460; padding: 6px 12px; border-radius: 6px; font-size: 13px; }
+  .player .seed-num { color: #e94560; font-weight: 700; margin-right: 4px; }
+  .player .consec { color: #ff6b6b; font-size: 11px; margin-left: 4px; }
+  .round-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+  .round-header h2 { color: #e94560; }
+  #history { max-width: 800px; margin: 20px auto 0; }
+  #history h2 { color: #e94560; margin-bottom: 10px; }
+  .history-entry { background: #16213e; padding: 10px 14px; border-radius: 8px; margin-bottom: 6px; font-size: 13px; color: #ccc; }
+  .sync-status { text-align: center; font-size: 12px; color: #4ecca3; margin-bottom: 10px; }
+</style>
+</head>
+<body>
+
+<h1>🏓 Pickleball Court Tracker</h1>
+<div class="sync-status" id="syncStatus">🔄 Connecting to server...</div>
+
+<div id="setup">
+  <div class="setup-form">
+    <label>Number of Courts:</label>
+    <input type="number" id="numCourts" min="1" value="2" onchange="updateDummyNames()" oninput="updateDummyNames()" style="width:80px;padding:8px;border-radius:8px;border:none;background:#0f3460;color:#eee;font-size:14px;margin-bottom:12px">
+    <label>Enter player names (one per line, in seed order):</label>
+    <small>First player = Seed 1 (best). Total players must equal courts × 4.</small>
+    <textarea id="playerInput">Bob
+Jim
+Bill
+Jack
+Alice
+Tom
+Sue
+Dan</textarea>
+    <button onclick="startGame()">Start Game</button>
+  </div>
+</div>
+
+<div id="game">
+  <div class="round-header">
+    <h2>Round <span id="roundNum">1</span></h2>
+    <div>
+      <button onclick="resetGame()">Reset</button>
+    </div>
+  </div>
+  <div id="courts"></div>
+</div>
+
+<div id="history"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyD4C8latdB9eZxVRvk41t_YsZFVrUDFNHA",
+  authDomain: "pickleball-tracker-2ce69.firebaseapp.com",
+  databaseURL: "https://pickleball-tracker-2ce69-default-rtdb.firebaseio.com",
+  projectId: "pickleball-tracker-2ce69",
+  storageBucket: "pickleball-tracker-2ce69.firebasestorage.app",
+  messagingSenderId: "899482641607",
+  appId: "1:899482641607:web:b02e440285628554aa4ae2"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database().ref('game');
+
+let state = { players: [], round: 1, history: [], pendingResults: {} };
+let syncing = false;
+
+function saveState() {
+  db.set(state).then(() => {
+    document.getElementById('syncStatus').textContent = '✅ Synced — all devices see the same game';
+  }).catch(() => {
+    document.getElementById('syncStatus').textContent = '❌ Sync failed — check connection';
+  });
+}
+
+// Listen for real-time updates from Firebase
+db.on('value', (snapshot) => {
+  const data = snapshot.val();
+  if (data && data.players && data.players.length) {
+    state = data;
+    state.pendingResults = state.pendingResults || {};
+    state.history = state.history || [];
+    document.getElementById('setup').style.display = 'none';
+    document.getElementById('game').style.display = 'block';
+    render();
+  } else {
+    document.getElementById('setup').style.display = 'block';
+    document.getElementById('game').style.display = 'none';
+  }
+  document.getElementById('syncStatus').textContent = '✅ Connected — live sync active';
+});
+
+function startGame() {
+  const names = document.getElementById('playerInput').value.trim().split('\n').map(s => s.trim()).filter(Boolean);
+  const numCourts = parseInt(document.getElementById('numCourts').value);
+  const needed = numCourts * 4;
+  if (!numCourts || numCourts < 1) return alert('Enter a valid number of courts.');
+  if (names.length !== needed) return alert(`You need exactly ${needed} players for ${numCourts} courts. You entered ${names.length}.`);
+  state.players = names.map((name, i) => ({ name, seed: i + 1, consecLosses: 0 }));
+  state.round = 1;
+  state.history = [];
+  state.pendingResults = {};
+  document.getElementById('setup').style.display = 'none';
+  document.getElementById('game').style.display = 'block';
+  saveState();
+  render();
+}
+
+function resetGame() {
+  if (!confirm('Reset the game for everyone?')) return;
+  state = { players: [], round: 1, history: [], pendingResults: {} };
+  db.remove();
+  document.getElementById('setup').style.display = 'block';
+  document.getElementById('game').style.display = 'none';
+  document.getElementById('history').innerHTML = '';
+}
+
+function getCourts() {
+  const courts = [];
+  for (let i = 0; i < state.players.length; i += 4) {
+    courts.push(state.players.slice(i, i + 4));
+  }
+  return courts;
+}
+
+function render() {
+  document.getElementById('roundNum').textContent = state.round;
+  const courts = getCourts();
+  const numCourts = courts.length;
+  let html = '';
+  courts.forEach((court, ci) => {
+    const allResolved = state.pendingResults[ci] !== undefined;
+    html += `<div class="court"><h2>Court ${ci + 1}</h2>`;
+    html += `<div class="players-list" style="margin-bottom:10px">`;
+    court.forEach((p, si) => {
+      html += `<div class="player"><span class="seed-num">#${si+1}</span>${p.name}<span class="consec">${p.consecLosses > 0 ? ' (L×' + p.consecLosses + ')' : ''}</span></div>`;
+    });
+    html += `</div>`;
+    html += `<div class="matchups">`;
+    const tA = [court[0], court[3]];
+    const tB = [court[1], court[2]];
+    html += `<div class="match">`;
+    html += `<div class="team"><span><span class="seed">#1+#4</span> <span class="name">${tA[0].name} & ${tA[1].name}</span></span></div>`;
+    html += `<div class="vs">VS</div>`;
+    html += `<div class="team"><span><span class="seed">#2+#3</span> <span class="name">${tB[0].name} & ${tB[1].name}</span></span></div>`;
+    if (!allResolved) {
+      html += `<button onclick="recordResult(${ci},'A')">🏆 #1+#4 Win</button>`;
+      html += `<button onclick="recordResult(${ci},'B')" style="background:#0f3460;margin-top:4px">🏆 #2+#3 Win</button>`;
+    } else {
+      html += `<div style="text-align:center;color:#4ecca3;margin-top:8px;font-weight:600">✓ Winner: ${state.pendingResults[ci] === 'A' ? '#1+#4' : '#2+#3'}</div>`;
+    }
+    html += `</div></div></div>`;
+  });
+  document.getElementById('courts').innerHTML = html;
+
+  if (Object.keys(state.pendingResults).length === numCourts) {
+    document.getElementById('courts').innerHTML += `<div style="text-align:center;margin-top:10px"><button onclick="resolveRound()">Apply Results & Next Round →</button></div>`;
+  }
+
+  renderHistory();
+}
+
+function recordResult(courtIdx, winner) {
+  state.pendingResults[courtIdx] = winner;
+  saveState();
+  render();
+}
+
+function resolveRound() {
+  const numCourts = state.players.length / 4;
+  let roundLog = `<strong>Round ${state.round}:</strong><br>`;
+  const moves = [];
+
+  for (let ci = 0; ci < numCourts; ci++) {
+    const w = state.pendingResults[ci];
+    const base = ci * 4;
+    const winners = w === 'A' ? [0, 3] : [1, 2];
+    const losers = w === 'A' ? [1, 2] : [0, 3];
+    winners.forEach(i => { state.players[base + i].consecLosses = 0; });
+    losers.forEach(i => { state.players[base + i].consecLosses += 1; });
+    const wNames = winners.map(i => state.players[base + i].name).join(' & ');
+    const lNames = losers.map(i => state.players[base + i].name).join(' & ');
+    roundLog += `Court ${ci + 1}: 🏆 ${wNames} beat ${lNames}<br>`;
+  }
+
+  const newCourts = [];
+  for (let ci = 0; ci < numCourts; ci++) {
+    const base = ci * 4;
+    const w = state.pendingResults[ci];
+    const winIdxs = w === 'A' ? [0, 3] : [1, 2];
+    const loseIdxs = w === 'A' ? [1, 2] : [0, 3];
+    const winPlayers = winIdxs.map(i => state.players[base + i]);
+    const losePlayers = loseIdxs.map(i => state.players[base + i]);
+    newCourts.push([winPlayers[0], winPlayers[1], losePlayers[0], losePlayers[1]]);
+  }
+
+  for (let ci = 0; ci < numCourts - 1; ci++) {
+    const dropper = newCourts[ci][3];
+    const promoter = newCourts[ci + 1][0];
+    moves.push(`⬇️ ${dropper.name} drops from Court ${ci+1} → Court ${ci+2} (Seed 1)`);
+    moves.push(`⬆️ ${promoter.name} promotes from Court ${ci+2} → Court ${ci+1} (Seed 4)`);
+    newCourts[ci + 1][0] = dropper;
+    dropper.consecLosses = 0;
+    newCourts[ci][3] = promoter;
+    promoter.consecLosses = 0;
+  }
+
+  for (let ci = 0; ci < numCourts - 1; ci++) {
+    const seed3 = newCourts[ci][2];
+    if (seed3.consecLosses >= 2) {
+      const promoter2 = newCourts[ci + 1][1];
+      moves.push(`⬇️ ${seed3.name} (2 consecutive losses) drops from Court ${ci+1} → Court ${ci+2} (Seed 2)`);
+      moves.push(`⬆️ ${promoter2.name} promotes from Court ${ci+2} → Court ${ci+1} (Seed 3)`);
+      newCourts[ci + 1][1] = seed3;
+      seed3.consecLosses = 0;
+      newCourts[ci][2] = promoter2;
+      promoter2.consecLosses = 0;
+    }
+  }
+
+  if (moves.length) roundLog += `<br><strong>Movements:</strong><br>` + moves.map(m => `&nbsp;&nbsp;${m}`).join('<br>');
+  else roundLog += `<br><em>No court changes this round.</em>`;
+
+  state.players = newCourts.flat();
+  state.history.push(roundLog);
+  state.round++;
+  state.pendingResults = {};
+  saveState();
+  render();
+}
+
+function renderHistory() {
+  if (!state.history.length) { document.getElementById('history').innerHTML = ''; return; }
+  let html = '<h2>History</h2>';
+  state.history.slice().reverse().forEach(h => {
+    html += `<div class="history-entry">${h}</div>`;
+  });
+  document.getElementById('history').innerHTML = html;
+}
+
+const dummyNames = ['Bob','Jim','Bill','Jack','Alice','Tom','Sue','Dan','Mike','Lisa','Chris','Emma','Dave','Sara','Pete','Nina','Greg','Jill','Mark','Amy'];
+function updateDummyNames() {
+  const n = parseInt(document.getElementById('numCourts').value) * 4;
+  if (n > 0) document.getElementById('playerInput').value = dummyNames.slice(0, n).join('\n');
+}
+</script>
+</body>
+</html>
