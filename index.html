@@ -23,7 +23,7 @@
   .match .vs { text-align: center; color: #e94560; font-weight: 700; margin: 4px 0; }
   .match .team { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; }
   .match .team .seed { color: #aaa; font-size: 12px; margin-right: 8px; }
-  .match .team .name { font-weight: 600; }
+  .match .team .name { font-weight: 600; font-size: 16px; }
   .match button { width: 100%; margin-top: 8px; padding: 8px; font-size: 13px; }
   .players-list { display: flex; gap: 8px; flex-wrap: wrap; }
   .players-list .player { background: #0f3460; padding: 6px 12px; border-radius: 6px; font-size: 13px; }
@@ -35,35 +35,66 @@
   #history h2 { color: #e94560; margin-bottom: 10px; }
   .history-entry { background: #16213e; padding: 10px 14px; border-radius: 8px; margin-bottom: 6px; font-size: 13px; color: #ccc; }
   .sync-status { text-align: center; font-size: 12px; color: #4ecca3; margin-bottom: 10px; }
+  #lock { display: flex; justify-content: center; align-items: center; min-height: 60vh; }
+  #lock .lock-box { background: #16213e; padding: 30px; border-radius: 12px; text-align: center; }
+  #lock input { padding: 10px; border-radius: 8px; border: none; background: #0f3460; color: #eee; font-size: 16px; text-align: center; width: 200px; margin-top: 10px; }
+  #lock .error { color: #ff6b6b; font-size: 13px; margin-top: 8px; }
+  #app { display: none; }
+  .player-row { display: flex; align-items: center; gap: 6px; padding: 6px 8px; margin: 4px 0; background: #0f3460; border-radius: 8px; }
+  .player-row .seed-label { color: #e94560; font-weight: 700; min-width: 28px; }
+  .player-row input { flex: 1; padding: 6px; border-radius: 6px; border: none; background: #16213e; color: #eee; font-size: 14px; }
+  .player-row .move-btn { background: none; border: none; color: #4ecca3; cursor: pointer; font-size: 18px; padding: 0 2px; margin: 0; line-height: 1; }
+  .player-row .move-btn:hover { color: #e94560; }
+  .player-row .remove-btn { background: none; border: none; color: #ff6b6b; cursor: pointer; font-size: 16px; padding: 0 4px; margin: 0; }
 </style>
 </head>
 <body>
 
 <h1>🏓 Pickleball Court Tracker</h1>
+
+<div id="lock">
+  <div class="lock-box">
+    <label style="font-weight:600;font-size:16px">🔒 Enter Passcode</label><br>
+    <input type="password" id="passcodeInput" placeholder="Passcode" onkeydown="if(event.key==='Enter')checkPasscode()">
+    <br><button onclick="checkPasscode()">Enter</button>
+    <div class="error" id="lockError"></div>
+  </div>
+</div>
+
+<div id="app">
 <div class="sync-status" id="syncStatus">🔄 Connecting to server...</div>
 
 <div id="setup">
   <div class="setup-form">
+    <label>Load players from schedule:</label>
+    <select id="dateSelect" onchange="onDateSelect()" style="width:100%;padding:8px;border-radius:8px;border:none;background:#0f3460;color:#eee;font-size:14px;margin-bottom:12px">
+      <option value="">-- Select a date --</option>
+    </select>
+    <button onclick="fetchSchedule()" style="background:#0f3460;margin-bottom:12px">🔄 Refresh Schedule</button>
     <label>Number of Courts:</label>
     <input type="number" id="numCourts" min="1" value="2" onchange="updateDummyNames()" oninput="updateDummyNames()" style="width:80px;padding:8px;border-radius:8px;border:none;background:#0f3460;color:#eee;font-size:14px;margin-bottom:12px">
-    <label>Enter player names (one per line, in seed order):</label>
+    <label>Players (drag to reorder, edit if needed):</label>
     <small>First player = Seed 1 (best). Total players must equal courts × 4.</small>
-    <textarea id="playerInput">Bob
-Jim
-Bill
-Jack
-Alice
-Tom
-Sue
-Dan</textarea>
+    <div id="playerList" style="margin-bottom:12px"></div>
+    <button onclick="addPlayerRow()" style="background:#0f3460;margin-bottom:8px">+ Add Player</button>
     <button onclick="startGame()">Start Game</button>
+    <button onclick="startRandomGame()" style="background:#0f3460">🎲 Quick Game (no history)</button>
+    <button onclick="showPastSessions()" style="background:#0f3460">📜 Past Sessions</button>
   </div>
+</div>
+
+<div id="pastSessions" style="display:none;max-width:800px;margin:20px auto;">
+  <h2 style="color:#e94560;margin-bottom:12px">📜 Past Sessions</h2>
+  <div id="pastList"></div>
+  <button onclick="document.getElementById('pastSessions').style.display='none'" style="margin-top:10px">← Back</button>
 </div>
 
 <div id="game">
   <div class="round-header">
     <h2>Round <span id="roundNum">1</span></h2>
     <div>
+      <span id="sessionInfo" style="font-size:12px;color:#aaa;margin-right:12px"></span>
+      <button onclick="undoRound()" style="background:#0f3460">↩ Undo</button>
       <button onclick="resetGame()">Reset</button>
     </div>
   </div>
@@ -71,11 +102,41 @@ Dan</textarea>
 </div>
 
 <div id="history"></div>
+</div><!-- end #app -->
 
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
 <script>
-const firebaseConfig = {
+// --- Passcode Protection ---
+const PASSCODE = 'pickle2026';
+
+function checkPasscode() {
+  const input = document.getElementById('passcodeInput').value;
+  if (input === PASSCODE) {
+    sessionStorage.setItem('pb_auth', 'true');
+    unlock();
+  } else {
+    document.getElementById('lockError').textContent = 'Wrong passcode. Try again.';
+  }
+}
+
+function unlock() {
+  document.getElementById('lock').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  initApp();
+}
+
+// Auto-unlock if already authenticated this session
+if (sessionStorage.getItem('pb_auth') === 'true') {
+  document.addEventListener('DOMContentLoaded', unlock);
+}
+
+// --- App ---
+let state = { players: [], round: 1, history: [], pendingResults: {}, prevState: null };
+let db;
+
+function initApp() {
+  const firebaseConfig = {
   apiKey: "AIzaSyD4C8latdB9eZxVRvk41t_YsZFVrUDFNHA",
   authDomain: "pickleball-tracker-2ce69.firebaseapp.com",
   databaseURL: "https://pickleball-tracker-2ce69-default-rtdb.firebaseio.com",
@@ -84,22 +145,11 @@ const firebaseConfig = {
   messagingSenderId: "899482641607",
   appId: "1:899482641607:web:b02e440285628554aa4ae2"
 };
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database().ref('game');
+  firebase.initializeApp(firebaseConfig);
+  db = firebase.database().ref('game');
 
-let state = { players: [], round: 1, history: [], pendingResults: {} };
-let syncing = false;
-
-function saveState() {
-  db.set(state).then(() => {
-    document.getElementById('syncStatus').textContent = '✅ Synced — all devices see the same game';
-  }).catch(() => {
-    document.getElementById('syncStatus').textContent = '❌ Sync failed — check connection';
-  });
-}
-
-// Listen for real-time updates from Firebase
-db.on('value', (snapshot) => {
+  // Listen for real-time updates from Firebase
+  db.on('value', (snapshot) => {
   const data = snapshot.val();
   if (data && data.players && data.players.length) {
     state = data;
@@ -113,10 +163,21 @@ db.on('value', (snapshot) => {
     document.getElementById('game').style.display = 'none';
   }
   document.getElementById('syncStatus').textContent = '✅ Connected — live sync active';
-});
+  });
+  fetchSchedule();
+  renderPlayerList(dummyNames.slice(0, 8));
+} // end initApp
+
+function saveState() {
+  db.set(state).then(() => {
+    document.getElementById('syncStatus').textContent = '✅ Synced — all devices see the same game';
+  }).catch(() => {
+    document.getElementById('syncStatus').textContent = '❌ Sync failed — check connection';
+  });
+}
 
 function startGame() {
-  const names = document.getElementById('playerInput').value.trim().split('\n').map(s => s.trim()).filter(Boolean);
+  const names = getPlayerNames();
   const numCourts = parseInt(document.getElementById('numCourts').value);
   const needed = numCourts * 4;
   if (!numCourts || numCourts < 1) return alert('Enter a valid number of courts.');
@@ -125,6 +186,28 @@ function startGame() {
   state.round = 1;
   state.history = [];
   state.pendingResults = {};
+  state.sessionStart = new Date().toISOString();
+  state.sessionDate = document.getElementById('dateSelect').value || 'Custom Game';
+  state.isQuickGame = false;
+  document.getElementById('setup').style.display = 'none';
+  document.getElementById('game').style.display = 'block';
+  saveState();
+  render();
+}
+
+function startRandomGame() {
+  const names = getPlayerNames();
+  const numCourts = parseInt(document.getElementById('numCourts').value);
+  const needed = numCourts * 4;
+  if (!numCourts || numCourts < 1) return alert('Enter a valid number of courts.');
+  if (names.length !== needed) return alert(`You need exactly ${needed} players for ${numCourts} courts. You entered ${names.length}.`);
+  state.players = names.map((name, i) => ({ name, seed: i + 1, consecLosses: 0 }));
+  state.round = 1;
+  state.history = [];
+  state.pendingResults = {};
+  state.sessionStart = new Date().toISOString();
+  state.sessionDate = 'Quick Game';
+  state.isQuickGame = true;
   document.getElementById('setup').style.display = 'none';
   document.getElementById('game').style.display = 'block';
   saveState();
@@ -133,7 +216,19 @@ function startGame() {
 
 function resetGame() {
   if (!confirm('Reset the game for everyone?')) return;
-  state = { players: [], round: 1, history: [], pendingResults: {} };
+  // Archive current session if it has history and is not a quick game
+  if (state.history && state.history.length && !state.isQuickGame) {
+    const key = (state.sessionDate || 'Custom') + '_' + (state.sessionStart || new Date().toISOString()).replace(/[.#$/\[\]]/g, '_');
+    firebase.database().ref('archive/' + key.replace(/[.#$/\[\]]/g, '_')).set({
+      sessionDate: state.sessionDate || 'Custom Game',
+      sessionStart: state.sessionStart,
+      sessionEnd: new Date().toISOString(),
+      players: state.players,
+      history: state.history,
+      rounds: state.round - 1
+    });
+  }
+  state = { players: [], round: 1, history: [], pendingResults: {}, prevState: null };
   db.remove();
   document.getElementById('setup').style.display = 'block';
   document.getElementById('game').style.display = 'none';
@@ -150,6 +245,12 @@ function getCourts() {
 
 function render() {
   document.getElementById('roundNum').textContent = state.round;
+  if (state.sessionStart) {
+    let info = '';
+    if (state.sessionDate) info += state.sessionDate + ' · ';
+    info += 'Started: ' + new Date(state.sessionStart).toLocaleTimeString();
+    document.getElementById('sessionInfo').textContent = info;
+  }
   const courts = getCourts();
   const numCourts = courts.length;
   let html = '';
@@ -165,14 +266,17 @@ function render() {
     const tA = [court[0], court[3]];
     const tB = [court[1], court[2]];
     html += `<div class="match">`;
-    html += `<div class="team"><span><span class="seed">#1+#4</span> <span class="name">${tA[0].name} & ${tA[1].name}</span></span></div>`;
+    html += `<div style="color:#4ecca3;font-size:14px;font-weight:600;margin-bottom:4px">⬆ Top of the Court</div>`;
+    html += `<div class="team"><span class="name">${tA[0].name} & ${tA[1].name}</span></div>`;
     html += `<div class="vs">VS</div>`;
-    html += `<div class="team"><span><span class="seed">#2+#3</span> <span class="name">${tB[0].name} & ${tB[1].name}</span></span></div>`;
+    html += `<div style="color:#e94560;font-size:14px;font-weight:600;margin-bottom:4px">⬇ Bottom of the Court</div>`;
+    html += `<div class="team"><span class="name">${tB[0].name} & ${tB[1].name}</span></div>`;
     if (!allResolved) {
-      html += `<button onclick="recordResult(${ci},'A')">🏆 #1+#4 Win</button>`;
-      html += `<button onclick="recordResult(${ci},'B')" style="background:#0f3460;margin-top:4px">🏆 #2+#3 Win</button>`;
+      html += `<button onclick="recordResult(${ci},'A')">🏆 Top Wins</button>`;
+      html += `<button onclick="recordResult(${ci},'B')" style="background:#0f3460;margin-top:4px">🏆 Bottom Wins</button>`;
     } else {
-      html += `<div style="text-align:center;color:#4ecca3;margin-top:8px;font-weight:600">✓ Winner: ${state.pendingResults[ci] === 'A' ? '#1+#4' : '#2+#3'}</div>`;
+      html += `<div style="text-align:center;color:#4ecca3;margin-top:8px;font-weight:600">✓ Winner: ${state.pendingResults[ci] === 'A' ? 'Top' : 'Bottom'}</div>`;
+      html += `<button onclick="clearResult(${ci})" style="background:#0f3460;margin-top:4px;font-size:12px">↩ Change</button>`;
     }
     html += `</div></div></div>`;
   });
@@ -191,9 +295,39 @@ function recordResult(courtIdx, winner) {
   render();
 }
 
+function clearResult(courtIdx) {
+  delete state.pendingResults[courtIdx];
+  saveState();
+  render();
+}
+
+function undoRound() {
+  if (!state.prevState) {
+    // No previous round — offer to go back to setup
+    if (!confirm('Go back to the starting screen?')) return;
+    state = { players: [], round: 1, history: [], pendingResults: {}, prevState: null };
+    db.remove();
+    document.getElementById('setup').style.display = 'block';
+    document.getElementById('game').style.display = 'none';
+    document.getElementById('history').innerHTML = '';
+    return;
+  }
+  if (!confirm('Undo last round?')) return;
+  const prev = JSON.parse(state.prevState);
+  state.players = prev.players;
+  state.round = prev.round;
+  state.history = prev.history;
+  state.pendingResults = prev.pendingResults;
+  state.prevState = null;
+  saveState();
+  render();
+}
+
 function resolveRound() {
+  // Save snapshot for undo
+  state.prevState = JSON.stringify({ players: state.players, round: state.round, history: state.history, pendingResults: state.pendingResults });
   const numCourts = state.players.length / 4;
-  let roundLog = `<strong>Round ${state.round}:</strong><br>`;
+  let roundLog = `<strong>Round ${state.round}:</strong> <span style="color:#aaa;font-size:11px">${new Date().toLocaleString()}</span><br>`;
   const moves = [];
 
   for (let ci = 0; ci < numCourts; ci++) {
@@ -263,10 +397,164 @@ function renderHistory() {
   document.getElementById('history').innerHTML = html;
 }
 
+function getPlayerNames() {
+  return [...document.querySelectorAll('#playerList .player-row input')].map(i => i.value.trim()).filter(Boolean);
+}
+
+function renderPlayerList(names) {
+  const list = document.getElementById('playerList');
+  list.innerHTML = '';
+  names.forEach((name, i) => {
+    const row = document.createElement('div');
+    row.className = 'player-row';
+    row.innerHTML = `<span class="seed-label">${i+1}.</span><button class="move-btn" onclick="movePlayer(${i},-1)">▲</button><button class="move-btn" onclick="movePlayer(${i},1)">▼</button><input value="${name}"><button class="move-btn" onclick="jumpPlayer(${i})" title="Move to position">#</button><button class="remove-btn" onclick="removePlayer(${i})">✕</button>`;
+    list.appendChild(row);
+  });
+}
+
+function movePlayer(idx, dir) {
+  const names = getPlayerNames();
+  const newIdx = idx + dir;
+  if (newIdx < 0 || newIdx >= names.length) return;
+  [names[idx], names[newIdx]] = [names[newIdx], names[idx]];
+  renderPlayerList(names);
+}
+
+function removePlayer(idx) {
+  const names = getPlayerNames();
+  names.splice(idx, 1);
+  renderPlayerList(names);
+}
+
+function jumpPlayer(idx) {
+  const names = getPlayerNames();
+  const pos = prompt(`Move "${names[idx]}" to which position? (1-${names.length})`);
+  if (!pos) return;
+  const newIdx = parseInt(pos) - 1;
+  if (isNaN(newIdx) || newIdx < 0 || newIdx >= names.length) return alert('Invalid position.');
+  const player = names.splice(idx, 1)[0];
+  names.splice(newIdx, 0, player);
+  renderPlayerList(names);
+}
+
+function renumberSeeds() {
+  document.querySelectorAll('#playerList .player-row .seed-label').forEach((el, i) => el.textContent = (i+1) + '.');
+}
+
+function addPlayerRow() {
+  const names = getPlayerNames();
+  names.push('');
+  renderPlayerList(names);
+  const inputs = document.querySelectorAll('#playerList .player-row input');
+  inputs[inputs.length - 1].focus();
+}
+
+function showPastSessions() {
+  const list = document.getElementById('pastList');
+  list.innerHTML = '<div style="color:#aaa">Loading...</div>';
+  document.getElementById('pastSessions').style.display = 'block';
+  firebase.database().ref('archive').once('value', snap => {
+    const data = snap.val();
+    if (!data) { list.innerHTML = '<div style="color:#aaa">No past sessions found.</div>'; return; }
+    let html = '';
+    Object.values(data).sort((a, b) => b.sessionStart.localeCompare(a.sessionStart)).forEach(s => {
+      const start = new Date(s.sessionStart).toLocaleString();
+      const end = s.sessionEnd ? new Date(s.sessionEnd).toLocaleString() : '?';
+      const dateLabel = s.sessionDate || 'Custom Game';
+      html += `<div style="background:#16213e;padding:12px;border-radius:8px;margin-bottom:10px">`;
+      html += `<div style="font-weight:600;color:#4ecca3;font-size:16px">${dateLabel}</div>`;
+      html += `<div style="font-size:12px;color:#aaa">${start} → ${end} · ${s.rounds} round(s)</div>`;
+      if (s.history) s.history.forEach(h => { html += `<div class="history-entry">${h}</div>`; });
+      html += `</div>`;
+    });
+    list.innerHTML = html;
+  });
+}
+
 const dummyNames = ['Bob','Jim','Bill','Jack','Alice','Tom','Sue','Dan','Mike','Lisa','Chris','Emma','Dave','Sara','Pete','Nina','Greg','Jill','Mark','Amy'];
 function updateDummyNames() {
   const n = parseInt(document.getElementById('numCourts').value) * 4;
-  if (n > 0) document.getElementById('playerInput').value = dummyNames.slice(0, n).join('\n');
+  if (n > 0 && !document.getElementById('dateSelect').value) {
+    renderPlayerList(dummyNames.slice(0, n));
+  }
+}
+
+const SCHEDULE_URL = 'https://docs.google.com/document/d/12111pYeuP-AgHln3_F2Fkha8jMoTxqInJQK-HX_r9ss/export?format=txt';
+let scheduleData = {};
+
+function fetchSchedule() {
+  document.getElementById('dateSelect').innerHTML = '<option value="">Loading...</option>';
+  fetch(SCHEDULE_URL)
+    .then(r => r.text())
+    .then(text => {
+      scheduleData = {};
+      // Find all date headers and their positions
+      const datePattern = /(?:WED|FRI|MON|TUE|THU|SAT|SUN)\s+[A-Z]+\s+\d+/gi;
+      const headers = [];
+      let m;
+      while ((m = datePattern.exec(text)) !== null) headers.push({ key: m[0].trim(), idx: m.index + m[0].length });
+
+      // Extract numbered entries from a text chunk
+      function extractPlayers(body) {
+        const players = [];
+        const re = /(\d+)\.\s*([^0-9?][^0-9]*?)(?=\s*\d+\.|$)/g;
+        let pm;
+        while ((pm = re.exec(body)) !== null) {
+          const name = pm[2].trim().replace(/\.+$/, '');
+          if (name && name !== '?') players.push(name);
+        }
+        // Last entry may have trailing waitlist names — cap to 2 words
+        if (players.length) {
+          const last = players[players.length - 1].split(/\s+/);
+          if (last.length > 2) players[players.length - 1] = last.slice(0, 2).join(' ');
+        }
+        return players;
+      }
+
+      headers.forEach((h, i) => {
+        const nextStart = i + 1 < headers.length ? headers[i + 1].idx - headers[i + 1].key.length : undefined;
+        const body = text.substring(h.idx, nextStart);
+        // Check if numbering restarts at "1." — means two dates share this body
+        // Split at the second occurrence of "1." (preceded by a higher number)
+        const restartMatch = body.match(/(\d+\.\s*[^0-9?].*?)\s+(?=1\.\s*[^0-9?])/);
+        if (restartMatch) {
+          const splitIdx = body.indexOf(restartMatch[0]) + restartMatch[0].length;
+          const firstHalf = body.substring(0, splitIdx);
+          const secondHalf = body.substring(splitIdx);
+          // First half belongs to the previous date header (which had empty body)
+          if (i > 0 && !scheduleData[headers[i - 1].key]) {
+            const p = extractPlayers(firstHalf);
+            if (p.length) scheduleData[headers[i - 1].key] = p;
+          }
+          const p = extractPlayers(secondHalf);
+          if (p.length) scheduleData[h.key] = p;
+        } else {
+          const p = extractPlayers(body);
+          if (p.length) scheduleData[h.key] = p;
+        }
+      });
+
+      const sel = document.getElementById('dateSelect');
+      sel.innerHTML = '<option value="">-- Select a date --</option>';
+      Object.keys(scheduleData).forEach(d => {
+        const opt = document.createElement('option');
+        opt.value = d;
+        opt.textContent = d + ' (' + scheduleData[d].length + ' players)';
+        sel.appendChild(opt);
+      });
+    })
+    .catch(() => {
+      document.getElementById('dateSelect').innerHTML = '<option value="">Failed to load schedule</option>';
+    });
+}
+
+function onDateSelect() {
+  const key = document.getElementById('dateSelect').value;
+  if (!key || !scheduleData[key]) return;
+  const players = scheduleData[key];
+  renderPlayerList(players);
+  const courts = Math.floor(players.length / 4);
+  document.getElementById('numCourts').value = courts;
 }
 </script>
 </body>
