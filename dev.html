@@ -372,17 +372,23 @@ function archiveAndClear() {
   let promise = null;
   if (state.players && state.players.length && !state.isQuickGame) {
     const key = (state.sessionDate || 'Custom') + '_' + (state.sessionStart || new Date().toISOString()).replace(/[.#$/\[\]]/g, '_');
-    promise = firebase.database().ref(getArchivePath() + '/' + key.replace(/[.#$/\[\]]/g, '_')).set({
+    const archRef = firebase.database().ref(getArchivePath() + '/' + key.replace(/[.#$/\[\]]/g, '_'));
+    promise = archRef.set({
       sessionDate: state.sessionDate || 'Custom Game',
       sessionStart: state.sessionStart,
       sessionEnd: new Date().toISOString(),
       players: state.players,
       history: state.history || [],
       rounds: state.round - 1
+    }).then(() => {
+      // Clear game after archive is confirmed saved
+      state = { players: [], round: 1, history: [], pendingResults: {}, prevState: null };
+      if (db) db.remove();
     });
+  } else {
+    state = { players: [], round: 1, history: [], pendingResults: {}, prevState: null };
+    if (db) db.remove();
   }
-  state = { players: [], round: 1, history: [], pendingResults: {}, prevState: null };
-  if (db) db.remove();
   document.getElementById('setup').style.display = 'block';
   document.getElementById('game').style.display = 'none';
   document.getElementById('history').innerHTML = '';
