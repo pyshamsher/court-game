@@ -128,7 +128,7 @@
     <h2>Round <span id="roundNum">1</span></h2>
     <div>
       <span id="sessionInfo" style="font-size:12px;color:#aaa;margin-right:12px"></span>
-      <span id="sessionTimer" style="font-size:13px;color:#4ecca3;margin-right:12px;font-weight:600"></span>
+      <span id="sessionTimer" onclick="startSessionTimer()" style="font-size:13px;color:#4ecca3;margin-right:12px;font-weight:600;cursor:pointer" title="Click to set timer"></span>
       <button onclick="undoRound()" style="background:#0f3460">↩ Undo</button>
       <button onclick="resetGame()">Reset</button>
       <button onclick="endSession()" style="background:#e94560">🏁 End Session</button>
@@ -328,7 +328,6 @@ function startGame() {
   state.history = [];
   state.pendingResults = {};
   state.sessionStart = new Date().toISOString();
-  state.roundStart = Date.now();
   state.sessionDate = document.getElementById('dateSelect').value || document.getElementById('sessionDate').value || 'Custom Game';
   state.sessionName = document.getElementById('locationInput').value.trim() || '';
   state.isQuickGame = false;
@@ -351,7 +350,6 @@ function startRandomGame() {
   state.history = [];
   state.pendingResults = {};
   state.sessionStart = new Date().toISOString();
-  state.roundStart = Date.now();
   state.sessionDate = 'Quick Game';
   state.isQuickGame = true;
   document.getElementById('setup').style.display = 'none';
@@ -432,14 +430,23 @@ function fmtDupr(p) { return p.dupr ? ' <span class="dupr-badge">' + p.dupr.toFi
 
 let timerInterval = null;
 function startSessionTimer() {
-  if (timerInterval) return;
-  if (!state.roundStart) state.roundStart = Date.now();
+  clearInterval(timerInterval);
+  const mins = prompt('Set game timer (minutes):', '15');
+  if (!mins || isNaN(mins) || mins <= 0) { document.getElementById('sessionTimer').textContent = ''; return; }
+  state.timerEnd = Date.now() + mins * 60000;
+  saveState();
+  runTimer();
+}
+function runTimer() {
+  clearInterval(timerInterval);
   function tick() {
     const el = document.getElementById('sessionTimer');
-    if (!el || !state.roundStart) return;
-    const s = Math.floor((Date.now() - state.roundStart) / 1000);
-    const m = Math.floor(s / 60), sec = s % 60;
-    el.textContent = '⏱ Game ' + m + ':' + String(sec).padStart(2, '0');
+    if (!el || !state.timerEnd) return;
+    const left = Math.max(0, Math.floor((state.timerEnd - Date.now()) / 1000));
+    const m = Math.floor(left / 60), sec = left % 60;
+    el.textContent = '⏱ ' + m + ':' + String(sec).padStart(2, '0');
+    el.style.color = left <= 60 ? '#e94560' : left <= 180 ? '#f0a500' : '#4ecca3';
+    if (left === 0) { clearInterval(timerInterval); el.textContent = '⏱ TIME!'; }
   }
   tick();
   timerInterval = setInterval(tick, 1000);
@@ -452,7 +459,7 @@ function render() {
     if (state.sessionDate) info += state.sessionDate + ' · ';
     info += 'Started: ' + new Date(state.sessionStart).toLocaleTimeString();
     document.getElementById('sessionInfo').textContent = info;
-    startSessionTimer();
+    if (state.timerEnd) runTimer();
   }
   const courts = getCourts();
   const numCourts = courts.length;
@@ -586,7 +593,6 @@ function resolveRound() {
   state.players = newCourts.flat();
   state.history.push(roundLog);
   state.round++;
-  state.roundStart = Date.now();
   state.pendingResults = {};
   saveState();
   render();
