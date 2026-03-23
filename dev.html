@@ -129,7 +129,8 @@
     <div>
       <span id="sessionInfo" style="font-size:12px;color:#aaa;margin-right:12px"></span>
       <span id="sessionTimer" onclick="startSessionTimer()" style="font-size:13px;color:#4ecca3;margin-right:6px;font-weight:600;cursor:pointer;background:#0f3460;padding:4px 10px;border-radius:6px" title="Click to set timer">⏱ Set Timer</span>
-      <span onclick="playBuzzer()" style="font-size:11px;color:#aaa;cursor:pointer;margin-right:12px">🔊test</span>
+      <span onclick="playBuzzer()" style="font-size:11px;color:#aaa;cursor:pointer;margin-right:4px">🔊test</span>
+      <input id="buzzerVol" type="range" min="0" max="100" value="50" style="width:60px;vertical-align:middle;margin-right:12px" title="Buzzer volume">
       <button onclick="undoRound()" style="background:#0f3460">↩ Undo</button>
       <button onclick="resetGame()">Reset</button>
       <button onclick="endSession()" style="background:#e94560">🏁 End Session</button>
@@ -437,6 +438,7 @@ document.addEventListener('click', function() {
 }, { once: false });
 
 function playBuzzer() {
+  var vol = (document.getElementById('buzzerVol') ? document.getElementById('buzzerVol').value : 50) / 100;
   try {
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     if (audioCtx.state === 'suspended') audioCtx.resume();
@@ -444,7 +446,7 @@ function playBuzzer() {
       const o = audioCtx.createOscillator(), g = audioCtx.createGain();
       o.connect(g); g.connect(audioCtx.destination);
       o.frequency.value = 880; o.type = 'square';
-      g.gain.setValueAtTime(0.5, audioCtx.currentTime + t);
+      g.gain.setValueAtTime(vol, audioCtx.currentTime + t);
       g.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + t + 0.3);
       o.start(audioCtx.currentTime + t); o.stop(audioCtx.currentTime + t + 0.3);
     });
