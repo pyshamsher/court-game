@@ -69,9 +69,13 @@
 <div style="margin-bottom:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
   <label style="font-weight:600">🏷️ Session:</label>
   <input id="sessionDate" type="date" style="padding:8px;border-radius:8px;border:none;background:#0f3460;color:#eee;font-size:14px">
-  <input id="locationInput" placeholder="Group name" onkeydown="if(event.key==='Enter')switchLocation()" style="padding:8px;border-radius:8px;border:none;background:#0f3460;color:#eee;font-size:14px;width:160px">
+  <input id="locationInput" placeholder="Group name (optional)" onkeydown="if(event.key==='Enter')switchLocation()" style="padding:8px;border-radius:8px;border:none;background:#0f3460;color:#eee;font-size:14px;width:160px">
   <button onclick="switchLocation()" style="margin:0;padding:8px 12px">Go</button>
   <span id="locationLabel" style="color:#4ecca3;font-size:13px"></span>
+</div>
+<div id="sessionList" style="display:none;margin-bottom:12px;background:#0f3460;padding:12px;border-radius:8px">
+  <label style="font-weight:600;margin-bottom:8px;display:block">📋 Active Sessions — tap to join:</label>
+  <div id="sessionListItems" style="max-height:200px;overflow-y:auto"></div>
 </div>
 
 <div id="setup">
@@ -194,15 +198,24 @@ function initApp() {
     initDbListener();
   }
 
-  window.switchLocation = function() {
-    const date = document.getElementById('sessionDate').value;
-    const name = document.getElementById('locationInput').value.trim();
-    if (!date || !name) return alert('Enter both a date and group name.');
-    currentLocation = date + '|' + name;
+  window.switchLocation = function(sessionKey) {
+    let date, name;
+    if (sessionKey) {
+      const parts = sessionKey.split('|');
+      date = parts[0]; name = parts[1] || '';
+      document.getElementById('sessionDate').value = date;
+      document.getElementById('locationInput').value = name;
+    } else {
+      date = document.getElementById('sessionDate').value;
+      name = document.getElementById('locationInput').value.trim();
+    }
+    if (!date) return alert('Select a date.');
+    currentLocation = name ? date + '|' + name : date;
     const key = currentLocation.toLowerCase().replace(/[^a-z0-9]/g, '');
     sessionStorage.setItem('pkLocation', currentLocation);
-    document.getElementById('locationLabel').textContent = '✅ ' + date + ' — ' + name;
+    document.getElementById('locationLabel').textContent = '✅ ' + date + (name ? ' — ' + name : '');
     document.getElementById('syncStatus').textContent = '🔄 Connecting to server...';
+    document.getElementById('sessionList').style.display = 'none';
     if (db) { db.off(); db = null; }
     if (rrDb) { rrDb.off(); rrDb = null; }
     db = firebase.database().ref('dev-' + key + '/game');
@@ -211,6 +224,33 @@ function initApp() {
     initDbListener();
     listenRR();
   }
+
+  // Load active sessions list
+  function loadSessionList() {
+    firebase.database().ref().once('value', snap => {
+      const data = snap.val();
+      if (!data) return;
+      const items = document.getElementById('sessionListItems');
+      const sessions = [];
+      Object.keys(data).forEach(k => {
+        if (k.startsWith('dev-') && data[k].game && data[k].game.players && data[k].game.players.length) {
+          const raw = k.replace('dev-', '');
+          // Try to find the original session key from the game data
+          const playerCount = data[k].game.players.length;
+          const round = data[k].game.round || 1;
+          sessions.push({ key: raw, playerCount, round, sessionDate: data[k].game.sessionDate || '' });
+        }
+      });
+      if (!sessions.length) return;
+      document.getElementById('sessionList').style.display = 'block';
+      items.innerHTML = sessions.map(s => {
+        const label = s.sessionDate || s.key;
+        return `<div onclick="switchLocation('${s.key}')" style="padding:8px;margin:4px 0;background:#16213e;border-radius:6px;cursor:pointer;display:flex;justify-content:space-between">
+          <span>🏓 ${label}</span><span style="color:#4ecca3">${s.playerCount} players · Round ${s.round}</span></div>`;
+      }).join('');
+    });
+  }
+  if (!currentLocation) loadSessionList();
 
   function getArchivePath() { return 'dev-' + currentLocation.toLowerCase().replace(/[^a-z0-9]/g, '') + '/archive'; }
   function getRrPath() { return 'dev-' + currentLocation.toLowerCase().replace(/[^a-z0-9]/g, '') + '/rr'; }
