@@ -360,20 +360,24 @@ function resetGame() {
 
 function endSession() {
   if (!confirm('End this session and save to history?')) return;
-  archiveAndClear();
-  sessionStorage.removeItem('pkLocation');
-  location.reload();
+  const archivePromise = archiveAndClear();
+  if (archivePromise) {
+    archivePromise.then(() => { sessionStorage.removeItem('pkLocation'); location.reload(); });
+  } else {
+    sessionStorage.removeItem('pkLocation'); location.reload();
+  }
 }
 
 function archiveAndClear() {
-  if (state.history && state.history.length && !state.isQuickGame) {
+  let promise = null;
+  if (state.players && state.players.length && !state.isQuickGame) {
     const key = (state.sessionDate || 'Custom') + '_' + (state.sessionStart || new Date().toISOString()).replace(/[.#$/\[\]]/g, '_');
-    firebase.database().ref(getArchivePath() + '/' + key.replace(/[.#$/\[\]]/g, '_')).set({
+    promise = firebase.database().ref(getArchivePath() + '/' + key.replace(/[.#$/\[\]]/g, '_')).set({
       sessionDate: state.sessionDate || 'Custom Game',
       sessionStart: state.sessionStart,
       sessionEnd: new Date().toISOString(),
       players: state.players,
-      history: state.history,
+      history: state.history || [],
       rounds: state.round - 1
     });
   }
@@ -382,6 +386,7 @@ function archiveAndClear() {
   document.getElementById('setup').style.display = 'block';
   document.getElementById('game').style.display = 'none';
   document.getElementById('history').innerHTML = '';
+  return promise;
 }
 
 function getCourts() {
