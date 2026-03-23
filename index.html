@@ -306,24 +306,24 @@ function playBuzzer() {
 }
 
 let timerInterval = null;
+let localTimerEnd = null;
 function startSessionTimer() {
   clearInterval(timerInterval);
   const mins = prompt('Set game timer (minutes):', '15');
   if (!mins || isNaN(mins) || mins <= 0) { document.getElementById('sessionTimer').textContent = '⏱ Set Timer'; return; }
-  state.timerEnd = Date.now() + mins * 60000;
-  saveState();
+  localTimerEnd = Date.now() + mins * 60000;
   runTimer();
 }
 function runTimer() {
   clearInterval(timerInterval);
   function tick() {
     const el = document.getElementById('sessionTimer');
-    if (!el || !state.timerEnd) return;
-    const left = Math.max(0, Math.floor((state.timerEnd - Date.now()) / 1000));
+    if (!el || !localTimerEnd) return;
+    const left = Math.max(0, Math.floor((localTimerEnd - Date.now()) / 1000));
     const m = Math.floor(left / 60), sec = left % 60;
     el.textContent = '⏱ ' + m + ':' + String(sec).padStart(2, '0');
     el.style.color = left <= 60 ? '#e94560' : left <= 180 ? '#f0a500' : '#4ecca3';
-    if (left === 0) { clearInterval(timerInterval); timerInterval = null; el.textContent = '⏱ TIME!'; playBuzzer(); state.timerEnd = null; saveState(); }
+    if (left === 0) { clearInterval(timerInterval); timerInterval = null; el.textContent = '⏱ TIME!'; playBuzzer(); localTimerEnd = null; }
   }
   tick();
   timerInterval = setInterval(tick, 1000);
@@ -336,8 +336,8 @@ function render() {
     if (state.sessionDate) info += state.sessionDate + ' · ';
     info += 'Started: ' + new Date(state.sessionStart).toLocaleTimeString();
     document.getElementById('sessionInfo').textContent = info;
-    if (state.timerEnd && state.timerEnd > Date.now()) runTimer();
-    else if (document.getElementById('sessionTimer')) document.getElementById('sessionTimer').textContent = '⏱ Set Timer';
+    if (localTimerEnd && localTimerEnd > Date.now()) runTimer();
+    else if (!localTimerEnd && document.getElementById('sessionTimer')) document.getElementById('sessionTimer').textContent = '⏱ Set Timer';
   }
   const courts = getCourts();
   const numCourts = courts.length;
