@@ -66,9 +66,10 @@
 <div id="app">
 <div class="sync-status" id="syncStatus">🔄 Connecting to server...</div>
 
-<div style="margin-bottom:12px;display:flex;align-items:center;gap:8px">
+<div style="margin-bottom:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
   <label style="font-weight:600">🏷️ Session:</label>
-  <input id="locationInput" placeholder="Enter session name (e.g. Tuesday Group)" onkeydown="if(event.key==='Enter')switchLocation()" style="padding:8px;border-radius:8px;border:none;background:#0f3460;color:#eee;font-size:14px;flex:1">
+  <input id="sessionDate" type="date" style="padding:8px;border-radius:8px;border:none;background:#0f3460;color:#eee;font-size:14px">
+  <input id="locationInput" placeholder="Group name" onkeydown="if(event.key==='Enter')switchLocation()" style="padding:8px;border-radius:8px;border:none;background:#0f3460;color:#eee;font-size:14px;width:160px">
   <button onclick="switchLocation()" style="margin:0;padding:8px 12px">Go</button>
   <span id="locationLabel" style="color:#4ecca3;font-size:13px"></span>
 </div>
@@ -183,20 +184,24 @@ function initApp() {
 };
   firebase.initializeApp(firebaseConfig);
   let currentLocation = sessionStorage.getItem('pkLocation') || '';
+  document.getElementById('sessionDate').value = new Date().toISOString().slice(0, 10);
   if (currentLocation) {
-    document.getElementById('locationInput').value = currentLocation;
-    document.getElementById('locationLabel').textContent = '✅ ' + currentLocation;
+    const parts = currentLocation.split('|');
+    if (parts.length === 2) { document.getElementById('sessionDate').value = parts[0]; document.getElementById('locationInput').value = parts[1]; }
+    else document.getElementById('locationInput').value = currentLocation;
+    document.getElementById('locationLabel').textContent = '✅ ' + currentLocation.replace('|', ' — ');
     db = firebase.database().ref('dev-' + currentLocation.toLowerCase().replace(/[^a-z0-9]/g, '') + '/game');
     initDbListener();
   }
 
   function switchLocation() {
-    const raw = document.getElementById('locationInput').value.trim();
-    if (!raw) return;
-    currentLocation = raw;
-    const key = raw.toLowerCase().replace(/[^a-z0-9]/g, '');
-    sessionStorage.setItem('pkLocation', raw);
-    document.getElementById('locationLabel').textContent = '✅ ' + raw;
+    const date = document.getElementById('sessionDate').value;
+    const name = document.getElementById('locationInput').value.trim();
+    if (!date || !name) return alert('Enter both a date and group name.');
+    currentLocation = date + '|' + name;
+    const key = currentLocation.toLowerCase().replace(/[^a-z0-9]/g, '');
+    sessionStorage.setItem('pkLocation', currentLocation);
+    document.getElementById('locationLabel').textContent = '✅ ' + date + ' — ' + name;
     document.getElementById('syncStatus').textContent = '🔄 Connecting to server...';
     if (db) { db.off(); db = null; }
     if (rrDb) { rrDb.off(); rrDb = null; }
