@@ -328,6 +328,7 @@ function startGame() {
   state.history = [];
   state.pendingResults = {};
   state.sessionStart = new Date().toISOString();
+  state.roundStart = Date.now();
   state.sessionDate = document.getElementById('dateSelect').value || document.getElementById('sessionDate').value || 'Custom Game';
   state.sessionName = document.getElementById('locationInput').value.trim() || '';
   state.isQuickGame = false;
@@ -350,6 +351,7 @@ function startRandomGame() {
   state.history = [];
   state.pendingResults = {};
   state.sessionStart = new Date().toISOString();
+  state.roundStart = Date.now();
   state.sessionDate = 'Quick Game';
   state.isQuickGame = true;
   document.getElementById('setup').style.display = 'none';
@@ -431,12 +433,13 @@ function fmtDupr(p) { return p.dupr ? ' <span class="dupr-badge">' + p.dupr.toFi
 let timerInterval = null;
 function startSessionTimer() {
   if (timerInterval) return;
+  if (!state.roundStart) state.roundStart = Date.now();
   function tick() {
     const el = document.getElementById('sessionTimer');
-    if (!state.sessionStart || !el) return;
-    const s = Math.floor((Date.now() - new Date(state.sessionStart).getTime()) / 1000);
-    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
-    el.textContent = '⏱ ' + (h ? h + ':' : '') + String(m).padStart(h ? 2 : 1, '0') + ':' + String(sec).padStart(2, '0');
+    if (!el || !state.roundStart) return;
+    const s = Math.floor((Date.now() - state.roundStart) / 1000);
+    const m = Math.floor(s / 60), sec = s % 60;
+    el.textContent = '⏱ Game ' + m + ':' + String(sec).padStart(2, '0');
   }
   tick();
   timerInterval = setInterval(tick, 1000);
@@ -583,6 +586,7 @@ function resolveRound() {
   state.players = newCourts.flat();
   state.history.push(roundLog);
   state.round++;
+  state.roundStart = Date.now();
   state.pendingResults = {};
   saveState();
   render();
