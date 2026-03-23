@@ -360,12 +360,28 @@ function resetGame() {
 
 function endSession() {
   if (!confirm('End this session and save to history?')) return;
-  const archivePromise = archiveAndClear();
-  if (archivePromise) {
-    archivePromise.then(() => { sessionStorage.removeItem('pkLocation'); location.reload(); });
-  } else {
-    sessionStorage.removeItem('pkLocation'); location.reload();
+  // Capture state before anything resets it
+  const snap = JSON.parse(JSON.stringify(state));
+  const path = getArchivePath();
+  // Detach listener so db.remove doesn't trigger state reset
+  if (db) db.off();
+  let promise = Promise.resolve();
+  if (snap.players && snap.players.length && !snap.isQuickGame) {
+    const key = (snap.sessionDate || 'Custom') + '_' + (snap.sessionStart || new Date().toISOString()).replace(/[.#$/\[\]]/g, '_');
+    promise = firebase.database().ref(path + '/' + key.replace(/[.#$/\[\]]/g, '_')).set({
+      sessionDate: snap.sessionDate || 'Custom Game',
+      sessionStart: snap.sessionStart,
+      sessionEnd: new Date().toISOString(),
+      players: snap.players,
+      history: snap.history || [],
+      rounds: snap.round - 1
+    });
   }
+  promise.then(() => {
+    if (db) db.remove();
+    sessionStorage.removeItem('pkLocation');
+    location.reload();
+  });
 }
 
 function archiveAndClear() {
