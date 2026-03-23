@@ -128,7 +128,7 @@
     <h2>Round <span id="roundNum">1</span></h2>
     <div>
       <span id="sessionInfo" style="font-size:12px;color:#aaa;margin-right:12px"></span>
-      <span id="sessionTimer" onclick="startSessionTimer()" style="font-size:13px;color:#4ecca3;margin-right:12px;font-weight:600;cursor:pointer" title="Click to set timer"></span>
+      <span id="sessionTimer" onclick="startSessionTimer()" style="font-size:13px;color:#4ecca3;margin-right:12px;font-weight:600;cursor:pointer;background:#0f3460;padding:4px 10px;border-radius:6px" title="Click to set timer">⏱ Set Timer</span>
       <button onclick="undoRound()" style="background:#0f3460">↩ Undo</button>
       <button onclick="resetGame()">Reset</button>
       <button onclick="endSession()" style="background:#e94560">🏁 End Session</button>
@@ -459,7 +459,8 @@ function render() {
     if (state.sessionDate) info += state.sessionDate + ' · ';
     info += 'Started: ' + new Date(state.sessionStart).toLocaleTimeString();
     document.getElementById('sessionInfo').textContent = info;
-    if (state.timerEnd) runTimer();
+    if (state.timerEnd && state.timerEnd > Date.now()) runTimer();
+    else document.getElementById('sessionTimer').textContent = '⏱ Set Timer';
   }
   const courts = getCourts();
   const numCourts = courts.length;
