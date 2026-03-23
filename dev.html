@@ -229,7 +229,7 @@ function initApp() {
     document.getElementById('syncStatus').textContent = '🔄 Connecting to server...';
     document.getElementById('sessionPicker').querySelector('#newSessionForm').style.display = 'none';
     document.getElementById('sessionList').style.display = 'none';
-    document.getElementById('sessionPicker').querySelectorAll(':scope > div:first-child')[0].style.display = 'none';
+    try { document.getElementById('sessionPicker').children[0].style.display = 'none'; } catch(e) {}
     if (db) { db.off(); db = null; }
     if (rrDb) { rrDb.off(); rrDb = null; }
     db = firebase.database().ref('dev-' + key + '/game');
@@ -308,7 +308,7 @@ function saveState() {
 }
 
 function startGame() {
-  if (!db) return alert('Enter a session name first.');
+  if (!db) { switchLocation(); if (!db) return; }
   const names = getPlayerNames();
   const duprs = getPlayerDuprs();
   const numCourts = parseInt(document.getElementById('numCourts').value);
@@ -329,7 +329,7 @@ function startGame() {
 }
 
 function startRandomGame() {
-  if (!db) return alert('Enter a session name first.');
+  if (!db) { switchLocation(); if (!db) return; }
   const names = getPlayerNames();
   const duprs = getPlayerDuprs();
   const numCourts = parseInt(document.getElementById('numCourts').value);
