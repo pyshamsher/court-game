@@ -111,6 +111,11 @@ Surge account: mr.shamshersingh@gmail.com
 - **Balanced RR pairing** (dev only) — snake draft team formation when DUPR ratings are entered
 - **DUPR ratings** — optional rating field per player in setup, teal badges shown during games
 - **🔍 Fetch DUPR Ratings** — log in with DUPR account to auto-fetch doubles ratings for all players
+- **Self-match fix** — uses logged-in user's own profile from login response to match players the search API can't find
+- **Last-name fallback** — retries search with last name only when full name returns no hits
+- **Canada geo filter** — DUPR search limited to 1000km radius from Calgary for better local matches
+- **Interactive DUPR picker** — after fetch, shows dropdown per player with all search hits; re-search box to look up by full name; Apply button keeps unmatched players visible for correction
+- **Auto-fill DUPR fields** — confident matches populate player list immediately before manual review
 - **Fuzzy name matching** — last name priority, prefix matching for DUPR lookups
 - **📊 Sort by DUPR** — auto-seeds player list by rating; auto-sorts after fetch
 
