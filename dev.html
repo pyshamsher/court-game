@@ -66,6 +66,13 @@
 <div id="app">
 <div class="sync-status" id="syncStatus">🔄 Connecting to server...</div>
 
+<div style="margin-bottom:12px;display:flex;align-items:center;gap:8px">
+  <label style="font-weight:600">🏷️ Session:</label>
+  <input id="locationInput" placeholder="Enter session name (e.g. Tuesday Group)" onkeydown="if(event.key==='Enter')switchLocation()" style="padding:8px;border-radius:8px;border:none;background:#0f3460;color:#eee;font-size:14px;flex:1">
+  <button onclick="switchLocation()" style="margin:0;padding:8px 12px">Go</button>
+  <span id="locationLabel" style="color:#4ecca3;font-size:13px"></span>
+</div>
+
 <div id="setup">
   <div class="setup-form">
     <label>Load players from schedule:</label>
@@ -175,8 +182,31 @@ function initApp() {
   appId: "1:899482641607:web:b02e440285628554aa4ae2"
 };
   firebase.initializeApp(firebaseConfig);
-  db = firebase.database().ref('dev-game');
+  let currentLocation = sessionStorage.getItem('pkLocation') || '';
+  if (currentLocation) {
+    document.getElementById('locationInput').value = currentLocation;
+    document.getElementById('locationLabel').textContent = '✅ ' + currentLocation;
+    db = firebase.database().ref('dev-' + currentLocation.toLowerCase().replace(/[^a-z0-9]/g, '') + '/game');
+    initDbListener();
+  }
 
+  function switchLocation() {
+    const raw = document.getElementById('locationInput').value.trim();
+    if (!raw) return;
+    currentLocation = raw;
+    const key = raw.toLowerCase().replace(/[^a-z0-9]/g, '');
+    sessionStorage.setItem('pkLocation', raw);
+    document.getElementById('locationLabel').textContent = '✅ ' + raw;
+    if (db) db.off();
+    if (rrDb) { rrDb.off(); rrDb = null; }
+    db = firebase.database().ref('dev-' + key + '/game');
+    initDbListener();
+  }
+
+  function getArchivePath() { return 'dev-' + currentLocation.toLowerCase().replace(/[^a-z0-9]/g, '') + '/archive'; }
+  function getRrPath() { return 'dev-' + currentLocation.toLowerCase().replace(/[^a-z0-9]/g, '') + '/rr'; }
+
+  function initDbListener() {
   // Listen for real-time updates from Firebase
   db.on('value', (snapshot) => {
   const data = snapshot.val();
@@ -193,6 +223,8 @@ function initApp() {
   }
   document.getElementById('syncStatus').textContent = '✅ Connected — live sync active';
   });
+  }
+  if (currentLocation) initDbListener();
   fetchSchedule();
   renderPlayerList(dummyNames.slice(0, 8));
   listenRR();
@@ -251,7 +283,7 @@ function resetGame() {
   // Archive current session if it has history and is not a quick game
   if (state.history && state.history.length && !state.isQuickGame) {
     const key = (state.sessionDate || 'Custom') + '_' + (state.sessionStart || new Date().toISOString()).replace(/[.#$/\[\]]/g, '_');
-    firebase.database().ref('dev-archive/' + key.replace(/[.#$/\[\]]/g, '_')).set({
+    firebase.database().ref(getArchivePath() + '/' + key.replace(/[.#$/\[\]]/g, '_')).set({
       sessionDate: state.sessionDate || 'Custom Game',
       sessionStart: state.sessionStart,
       sessionEnd: new Date().toISOString(),
@@ -716,7 +748,7 @@ function showPastSessions() {
   const list = document.getElementById('pastList');
   list.innerHTML = '<div style="color:#aaa">Loading...</div>';
   document.getElementById('pastSessions').style.display = 'block';
-  firebase.database().ref('dev-archive').once('value', snap => {
+  firebase.database().ref(getArchivePath()).once('value', snap => {
     const data = snap.val();
     if (!data) { list.innerHTML = '<div style="color:#aaa">No past sessions found.</div>'; return; }
     let html = '';
@@ -825,7 +857,7 @@ let rrState = null;
 let rrDb;
 
 function initRRDb() {
-  if (!rrDb) rrDb = firebase.database().ref('dev-rr');
+  if (!rrDb) rrDb = firebase.database().ref(getRrPath());
 }
 
 function startRoundRobin() {
