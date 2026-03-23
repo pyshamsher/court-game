@@ -841,7 +841,10 @@ async function fetchDuprRatings() {
 }
 
 function showPastSessions() {
+  if (!db) { switchLocation(); }
+  if (!db) return alert('Select a date first.');
   const list = document.getElementById('pastList');
+  const path = getArchivePath();
   list.innerHTML = '<div style="color:#aaa">Loading...</div>';
   document.getElementById('pastSessions').style.display = 'block';
   firebase.database().ref(getArchivePath()).once('value', snap => {
