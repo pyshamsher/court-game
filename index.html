@@ -110,6 +110,7 @@
       <span id="sessionInfo" style="font-size:12px;color:#aaa;margin-right:12px"></span>
       <button onclick="undoRound()" style="background:#0f3460">↩ Undo</button>
       <button onclick="resetGame()">Reset</button>
+      <button onclick="endSession()" style="background:#e94560">🏁 End Session</button>
     </div>
   </div>
   <div id="courts"></div>
@@ -232,7 +233,6 @@ function startRandomGame() {
 
 function resetGame() {
   if (!confirm('Reset the game for everyone?')) return;
-  // Archive current session if it has history and is not a quick game
   if (state.history && state.history.length && !state.isQuickGame) {
     const key = (state.sessionDate || 'Custom') + '_' + (state.sessionStart || new Date().toISOString()).replace(/[.#$/\[\]]/g, '_');
     firebase.database().ref('archive/' + key.replace(/[.#$/\[\]]/g, '_')).set({
@@ -249,6 +249,32 @@ function resetGame() {
   document.getElementById('setup').style.display = 'block';
   document.getElementById('game').style.display = 'none';
   document.getElementById('history').innerHTML = '';
+}
+
+function endSession() {
+  if (!confirm('End this session and save to history?')) return;
+  const snap = JSON.parse(JSON.stringify(state));
+  if (db) db.off();
+  let promise = Promise.resolve();
+  if (snap.players && snap.players.length && !snap.isQuickGame) {
+    const key = (snap.sessionDate || 'Custom') + '_' + (snap.sessionStart || new Date().toISOString()).replace(/[.#$/\[\]]/g, '_');
+    promise = firebase.database().ref('archive/' + key.replace(/[.#$/\[\]]/g, '_')).set({
+      sessionDate: snap.sessionDate || 'Custom Game',
+      sessionStart: snap.sessionStart,
+      sessionEnd: new Date().toISOString(),
+      players: snap.players,
+      history: snap.history || [],
+      rounds: snap.round - 1
+    });
+  }
+  promise.then(() => {
+    if (db) db.remove();
+    state = { players: [], round: 1, history: [], pendingResults: {}, prevState: null };
+    document.getElementById('setup').style.display = 'block';
+    document.getElementById('game').style.display = 'none';
+    document.getElementById('history').innerHTML = '';
+    location.reload();
+  });
 }
 
 function getCourts() {
@@ -679,18 +705,36 @@ function showPastSessions() {
     const data = snap.val();
     if (!data) { list.innerHTML = '<div style="color:#aaa">No past sessions found.</div>'; return; }
     let html = '';
-    Object.values(data).sort((a, b) => b.sessionStart.localeCompare(a.sessionStart)).forEach(s => {
+    Object.entries(data).sort((a, b) => b[1].sessionStart.localeCompare(a[1].sessionStart)).forEach(([archKey, s]) => {
       const start = new Date(s.sessionStart).toLocaleString();
       const end = s.sessionEnd ? new Date(s.sessionEnd).toLocaleString() : '?';
       const dateLabel = s.sessionDate || 'Custom Game';
+      const playerNames = s.players ? s.players.map(p => p.name || p).filter(Boolean) : [];
+      const playerDuprs = s.players ? s.players.map(p => p.dupr || 0) : [];
       html += `<div style="background:#16213e;padding:12px;border-radius:8px;margin-bottom:10px">`;
+      html += `<div style="display:flex;justify-content:space-between;align-items:center;gap:6px">`;
       html += `<div style="font-weight:600;color:#4ecca3;font-size:16px">${dateLabel}</div>`;
-      html += `<div style="font-size:12px;color:#aaa">${start} → ${end} · ${s.rounds} round(s)</div>`;
+      html += `<div style="display:flex;gap:4px">`;
+      if (playerNames.length) html += `<button onclick='reopenSession(${JSON.stringify(playerNames)},${JSON.stringify(playerDuprs)})' style="margin:0;padding:4px 10px;font-size:12px;background:#4ecca3;color:#1a1a2e">🔄 Reopen</button>`;
+      html += `<button onclick="deletePastSession('${archKey}')" style="margin:0;padding:4px 10px;font-size:12px;background:#e94560">🗑️</button>`;
+      html += `</div></div>`;
+      html += `<div style="font-size:12px;color:#aaa">${start} → ${end} · ${s.rounds} round(s) · ${playerNames.length} players</div>`;
       if (s.history) s.history.forEach(h => { html += `<div class="history-entry">${h}</div>`; });
       html += `</div>`;
     });
     list.innerHTML = html;
   });
+}
+
+function reopenSession(names, duprs) {
+  document.getElementById('pastSessions').style.display = 'none';
+  document.getElementById('numCourts').value = Math.floor(names.length / 4) || 1;
+  renderPlayerList(names, duprs);
+}
+
+function deletePastSession(archKey) {
+  if (!confirm('Delete this past session?')) return;
+  firebase.database().ref('archive/' + archKey).remove().then(() => showPastSessions());
 }
 
 const dummyNames = ['Bob','Jim','Bill','Jack','Alice','Tom','Sue','Dan','Mike','Lisa','Chris','Emma','Dave','Sara','Pete','Nina','Greg','Jill','Mark','Amy'];
