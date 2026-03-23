@@ -245,30 +245,31 @@ function initApp() {
     document.getElementById('sessionList').style.display = 'block';
     document.getElementById('sessionListItems').innerHTML = '<div style="color:#aaa;padding:8px">Loading...</div>';
     document.getElementById('noSessions').style.display = 'none';
-    firebase.database().ref().once('value', snap => {
-      const data = snap.val();
-      const items = document.getElementById('sessionListItems');
-      const sessions = [];
-      if (data) {
-        Object.keys(data).forEach(k => {
-          if (k.startsWith('dev-') && data[k].game && data[k].game.players && data[k].game.players.length) {
-            const raw = k.replace('dev-', '');
-            const playerCount = data[k].game.players.length;
-            const round = data[k].game.round || 1;
-            sessions.push({ key: raw, playerCount, round, sessionDate: data[k].game.sessionDate || raw });
-          }
-        });
-      }
-      if (!sessions.length) {
-        items.innerHTML = '';
-        document.getElementById('noSessions').style.display = 'block';
-        return;
-      }
-      items.innerHTML = sessions.map(s => {
-        return `<div onclick="switchLocation('${s.key}')" style="padding:10px;margin:4px 0;background:#16213e;border-radius:6px;cursor:pointer;display:flex;justify-content:space-between">
-          <span>🏓 ${s.sessionDate}</span><span style="color:#4ecca3">${s.playerCount} players · Round ${s.round}</span></div>`;
-      }).join('');
-    });
+    // Use shallow REST query to avoid downloading all data
+    fetch('https://pickleball-tracker-2ce69-default-rtdb.firebaseio.com/.json?shallow=true')
+      .then(r => r.json())
+      .then(keys => {
+        if (!keys) { document.getElementById('sessionListItems').innerHTML = ''; document.getElementById('noSessions').style.display = 'block'; return; }
+        const devKeys = Object.keys(keys).filter(k => k.startsWith('dev-'));
+        if (!devKeys.length) { document.getElementById('sessionListItems').innerHTML = ''; document.getElementById('noSessions').style.display = 'block'; return; }
+        // Fetch just the game node for each dev key
+        const promises = devKeys.map(k =>
+          firebase.database().ref(k + '/game').once('value').then(snap => ({ key: k.replace('dev-', ''), data: snap.val() }))
+        );
+        return Promise.all(promises);
+      })
+      .then(results => {
+        if (!results) return;
+        const items = document.getElementById('sessionListItems');
+        const sessions = results.filter(r => r.data && r.data.players && r.data.players.length)
+          .map(r => ({ key: r.key, playerCount: r.data.players.length, round: r.data.round || 1, sessionDate: r.data.sessionDate || r.key }));
+        if (!sessions.length) { items.innerHTML = ''; document.getElementById('noSessions').style.display = 'block'; return; }
+        items.innerHTML = sessions.map(s =>
+          `<div onclick="switchLocation('${s.key}')" style="padding:10px;margin:4px 0;background:#16213e;border-radius:6px;cursor:pointer;display:flex;justify-content:space-between">
+          <span>🏓 ${s.sessionDate}</span><span style="color:#4ecca3">${s.playerCount} players · Round ${s.round}</span></div>`
+        ).join('');
+      })
+      .catch(() => { document.getElementById('sessionListItems').innerHTML = ''; document.getElementById('noSessions').style.display = 'block'; });
   }
   if (!currentLocation) loadSessionList();
 
