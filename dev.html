@@ -327,7 +327,7 @@ function startGame() {
   state.history = [];
   state.pendingResults = {};
   state.sessionStart = new Date().toISOString();
-  state.sessionDate = document.getElementById('dateSelect').value || 'Custom Game';
+  state.sessionDate = document.getElementById('dateSelect').value || document.getElementById('sessionDate').value || 'Custom Game';
   state.sessionName = document.getElementById('locationInput').value.trim() || '';
   state.isQuickGame = false;
   document.getElementById('setup').style.display = 'none';
