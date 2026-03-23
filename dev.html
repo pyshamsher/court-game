@@ -130,6 +130,7 @@
       <span id="sessionInfo" style="font-size:12px;color:#aaa;margin-right:12px"></span>
       <button onclick="undoRound()" style="background:#0f3460">↩ Undo</button>
       <button onclick="resetGame()">Reset</button>
+      <button onclick="endSession()" style="background:#e94560">🏁 End Session</button>
     </div>
   </div>
   <div id="courts"></div>
@@ -351,7 +352,17 @@ function startRandomGame() {
 
 function resetGame() {
   if (!confirm('Reset the game for everyone?')) return;
-  // Archive current session if it has history and is not a quick game
+  archiveAndClear();
+}
+
+function endSession() {
+  if (!confirm('End this session and save to history?')) return;
+  archiveAndClear();
+  sessionStorage.removeItem('pkLocation');
+  location.reload();
+}
+
+function archiveAndClear() {
   if (state.history && state.history.length && !state.isQuickGame) {
     const key = (state.sessionDate || 'Custom') + '_' + (state.sessionStart || new Date().toISOString()).replace(/[.#$/\[\]]/g, '_');
     firebase.database().ref(getArchivePath() + '/' + key.replace(/[.#$/\[\]]/g, '_')).set({
@@ -364,7 +375,7 @@ function resetGame() {
     });
   }
   state = { players: [], round: 1, history: [], pendingResults: {}, prevState: null };
-  db.remove();
+  if (db) db.remove();
   document.getElementById('setup').style.display = 'block';
   document.getElementById('game').style.display = 'none';
   document.getElementById('history').innerHTML = '';
