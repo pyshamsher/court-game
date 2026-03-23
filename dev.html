@@ -431,32 +431,16 @@ function getCourts() {
 function fmtDupr(p) { return p.dupr ? ' <span class="dupr-badge">' + p.dupr.toFixed(1) + '</span>' : ''; }
 
 let timerInterval = null;
-let audioCtx = null;
-function unlockAudio() {
-  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  if (audioCtx.state === 'suspended') audioCtx.resume();
-  // Play silent buffer to unlock iOS audio
-  const buf = audioCtx.createBuffer(1, 1, 22050);
-  const src = audioCtx.createBufferSource();
-  src.buffer = buf; src.connect(audioCtx.destination); src.start(0);
-}
-document.addEventListener('touchstart', unlockAudio, { once: true });
-document.addEventListener('click', unlockAudio, { once: true });
+let buzzerAudio = new Audio('https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg');
+buzzerAudio.preload = 'auto';
+document.addEventListener('touchstart', function() { buzzerAudio.load(); }, { once: true });
+document.addEventListener('click', function() { buzzerAudio.load(); }, { once: true });
 
 function playBuzzer() {
   var vol = (document.getElementById('buzzerVol') ? document.getElementById('buzzerVol').value : 50) / 100;
-  try {
-    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    if (audioCtx.state === 'suspended') audioCtx.resume();
-    [0, 0.4, 0.8].forEach(t => {
-      const o = audioCtx.createOscillator(), g = audioCtx.createGain();
-      o.connect(g); g.connect(audioCtx.destination);
-      o.frequency.value = 880; o.type = 'square';
-      g.gain.setValueAtTime(vol, audioCtx.currentTime + t);
-      g.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + t + 0.3);
-      o.start(audioCtx.currentTime + t); o.stop(audioCtx.currentTime + t + 0.3);
-    });
-  } catch(e) {}
+  buzzerAudio.volume = vol;
+  buzzerAudio.currentTime = 0;
+  buzzerAudio.play().catch(function(){});
   try { navigator.vibrate([300, 200, 300, 200, 300]); } catch(e) {}
 }
 
