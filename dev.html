@@ -432,10 +432,16 @@ function fmtDupr(p) { return p.dupr ? ' <span class="dupr-badge">' + p.dupr.toFi
 
 let timerInterval = null;
 let audioCtx = null;
-document.addEventListener('click', function() {
+function unlockAudio() {
   if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   if (audioCtx.state === 'suspended') audioCtx.resume();
-}, { once: false });
+  // Play silent buffer to unlock iOS audio
+  const buf = audioCtx.createBuffer(1, 1, 22050);
+  const src = audioCtx.createBufferSource();
+  src.buffer = buf; src.connect(audioCtx.destination); src.start(0);
+}
+document.addEventListener('touchstart', unlockAudio, { once: true });
+document.addEventListener('click', unlockAudio, { once: true });
 
 function playBuzzer() {
   var vol = (document.getElementById('buzzerVol') ? document.getElementById('buzzerVol').value : 50) / 100;
