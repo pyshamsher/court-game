@@ -108,6 +108,9 @@
     <h2>Round <span id="roundNum">1</span></h2>
     <div>
       <span id="sessionInfo" style="font-size:12px;color:#aaa;margin-right:12px"></span>
+      <span id="sessionTimer" onclick="startSessionTimer()" style="font-size:13px;color:#4ecca3;margin-right:6px;font-weight:600;cursor:pointer;background:#0f3460;padding:4px 10px;border-radius:6px" title="Click to set timer">⏱ Set Timer</span>
+      <span onclick="playBuzzer()" style="font-size:11px;color:#aaa;cursor:pointer;margin-right:4px">🔊test</span>
+      <input id="buzzerVol" type="range" min="0" max="100" value="50" style="width:60px;vertical-align:middle;margin-right:12px" title="Buzzer volume">
       <button onclick="undoRound()" style="background:#0f3460">↩ Undo</button>
       <button onclick="resetGame()">Reset</button>
       <button onclick="endSession()" style="background:#e94560">🏁 End Session</button>
@@ -233,6 +236,7 @@ function startRandomGame() {
 
 function resetGame() {
   if (!confirm('Reset the game for everyone?')) return;
+  clearInterval(timerInterval); timerInterval = null;
   if (state.history && state.history.length && !state.isQuickGame) {
     const key = (state.sessionDate || 'Custom') + '_' + (state.sessionStart || new Date().toISOString()).replace(/[.#$/\[\]]/g, '_');
     firebase.database().ref('archive/' + key.replace(/[.#$/\[\]]/g, '_')).set({
@@ -253,6 +257,7 @@ function resetGame() {
 
 function endSession() {
   if (!confirm('End this session and save to history?')) return;
+  clearInterval(timerInterval); timerInterval = null;
   const snap = JSON.parse(JSON.stringify(state));
   if (db) db.off();
   let promise = Promise.resolve();
@@ -287,6 +292,43 @@ function getCourts() {
 
 function fmtDupr(p) { return p.dupr ? ' <span class="dupr-badge">' + p.dupr.toFixed(1) + '</span>' : ''; }
 
+let buzzerAudio = new Audio('https://cdn.freesound.org/previews/536/536420_4921277-lq.mp3');
+buzzerAudio.preload = 'auto';
+document.addEventListener('touchstart', function() { buzzerAudio.load(); }, { once: true });
+document.addEventListener('click', function() { buzzerAudio.load(); }, { once: true });
+
+function playBuzzer() {
+  var vol = (document.getElementById('buzzerVol') ? document.getElementById('buzzerVol').value : 50) / 100;
+  buzzerAudio.volume = vol;
+  buzzerAudio.currentTime = 0;
+  buzzerAudio.play().catch(function(){});
+  try { navigator.vibrate([300, 200, 300, 200, 300]); } catch(e) {}
+}
+
+let timerInterval = null;
+function startSessionTimer() {
+  clearInterval(timerInterval);
+  const mins = prompt('Set game timer (minutes):', '15');
+  if (!mins || isNaN(mins) || mins <= 0) { document.getElementById('sessionTimer').textContent = '⏱ Set Timer'; return; }
+  state.timerEnd = Date.now() + mins * 60000;
+  saveState();
+  runTimer();
+}
+function runTimer() {
+  clearInterval(timerInterval);
+  function tick() {
+    const el = document.getElementById('sessionTimer');
+    if (!el || !state.timerEnd) return;
+    const left = Math.max(0, Math.floor((state.timerEnd - Date.now()) / 1000));
+    const m = Math.floor(left / 60), sec = left % 60;
+    el.textContent = '⏱ ' + m + ':' + String(sec).padStart(2, '0');
+    el.style.color = left <= 60 ? '#e94560' : left <= 180 ? '#f0a500' : '#4ecca3';
+    if (left === 0) { clearInterval(timerInterval); timerInterval = null; el.textContent = '⏱ TIME!'; playBuzzer(); state.timerEnd = null; saveState(); }
+  }
+  tick();
+  timerInterval = setInterval(tick, 1000);
+}
+
 function render() {
   document.getElementById('roundNum').textContent = state.round;
   if (state.sessionStart) {
@@ -294,6 +336,8 @@ function render() {
     if (state.sessionDate) info += state.sessionDate + ' · ';
     info += 'Started: ' + new Date(state.sessionStart).toLocaleTimeString();
     document.getElementById('sessionInfo').textContent = info;
+    if (state.timerEnd && state.timerEnd > Date.now()) runTimer();
+    else if (document.getElementById('sessionTimer')) document.getElementById('sessionTimer').textContent = '⏱ Set Timer';
   }
   const courts = getCourts();
   const numCourts = courts.length;
