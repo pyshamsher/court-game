@@ -194,7 +194,7 @@ function initApp() {
     initDbListener();
   }
 
-  function switchLocation() {
+  window.switchLocation = function() {
     const date = document.getElementById('sessionDate').value;
     const name = document.getElementById('locationInput').value.trim();
     if (!date || !name) return alert('Enter both a date and group name.');
