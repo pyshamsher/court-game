@@ -197,10 +197,14 @@ function initApp() {
     const key = raw.toLowerCase().replace(/[^a-z0-9]/g, '');
     sessionStorage.setItem('pkLocation', raw);
     document.getElementById('locationLabel').textContent = '✅ ' + raw;
-    if (db) db.off();
+    document.getElementById('syncStatus').textContent = '🔄 Connecting to server...';
+    if (db) { db.off(); db = null; }
     if (rrDb) { rrDb.off(); rrDb = null; }
     db = firebase.database().ref('dev-' + key + '/game');
+    document.getElementById('setup').style.display = 'block';
+    document.getElementById('game').style.display = 'none';
     initDbListener();
+    listenRR();
   }
 
   function getArchivePath() { return 'dev-' + currentLocation.toLowerCase().replace(/[^a-z0-9]/g, '') + '/archive'; }
