@@ -128,6 +128,7 @@
     <h2>Round <span id="roundNum">1</span></h2>
     <div>
       <span id="sessionInfo" style="font-size:12px;color:#aaa;margin-right:12px"></span>
+      <span id="sessionTimer" style="font-size:13px;color:#4ecca3;margin-right:12px;font-weight:600"></span>
       <button onclick="undoRound()" style="background:#0f3460">↩ Undo</button>
       <button onclick="resetGame()">Reset</button>
       <button onclick="endSession()" style="background:#e94560">🏁 End Session</button>
@@ -359,11 +360,13 @@ function startRandomGame() {
 
 function resetGame() {
   if (!confirm('Reset the game for everyone?')) return;
+  clearInterval(timerInterval); timerInterval = null;
   archiveAndClear();
 }
 
 function endSession() {
   if (!confirm('End this session and save to history?')) return;
+  clearInterval(timerInterval); timerInterval = null;
   // Capture state before anything resets it
   const snap = JSON.parse(JSON.stringify(state));
   const path = getArchivePath();
@@ -425,6 +428,20 @@ function getCourts() {
 
 function fmtDupr(p) { return p.dupr ? ' <span class="dupr-badge">' + p.dupr.toFixed(1) + '</span>' : ''; }
 
+let timerInterval = null;
+function startSessionTimer() {
+  if (timerInterval) return;
+  function tick() {
+    const el = document.getElementById('sessionTimer');
+    if (!state.sessionStart || !el) return;
+    const s = Math.floor((Date.now() - new Date(state.sessionStart).getTime()) / 1000);
+    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+    el.textContent = '⏱ ' + (h ? h + ':' : '') + String(m).padStart(h ? 2 : 1, '0') + ':' + String(sec).padStart(2, '0');
+  }
+  tick();
+  timerInterval = setInterval(tick, 1000);
+}
+
 function render() {
   document.getElementById('roundNum').textContent = state.round;
   if (state.sessionStart) {
@@ -432,6 +449,7 @@ function render() {
     if (state.sessionDate) info += state.sessionDate + ' · ';
     info += 'Started: ' + new Date(state.sessionStart).toLocaleTimeString();
     document.getElementById('sessionInfo').textContent = info;
+    startSessionTimer();
   }
   const courts = getCourts();
   const numCourts = courts.length;
