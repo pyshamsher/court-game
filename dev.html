@@ -691,9 +691,16 @@ async function fetchDuprRatings() {
       const combined = names.map((n, i) => ({ n, d: duprs[i] }));
       combined.sort((a, b) => b.d - a.d);
       renderPlayerList(combined.map(p => p.n), combined.map(p => p.d));
-      pickerDiv.remove();
+      pickerDiv.querySelectorAll('[data-idx]').forEach(sel => {
+        const idx = parseInt(sel.dataset.idx);
+        if (duprs[idx] > 0) sel.closest('div').style.display = 'none';
+      });
+      const remaining = names.filter((_, i) => !duprs[i] || duprs[i] <= 0).length;
+      if (remaining === 0) { pickerDiv.remove(); }
       status.style.color = '#4ecca3';
-      status.textContent = `✅ Applied DUPR ratings for ${applied}/${names.length} players (sorted by rating).`;
+      status.textContent = remaining > 0
+        ? `✅ Applied ${applied}/${names.length} ratings. ${remaining} still unmatched below:`
+        : `✅ Applied DUPR ratings for ${applied}/${names.length} players (sorted by rating).`;
     };
     pickerDiv.appendChild(applyBtn);
     status.parentNode.insertBefore(pickerDiv, status.nextSibling);
