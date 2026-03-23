@@ -851,17 +851,19 @@ function showPastSessions() {
     const data = snap.val();
     if (!data) { list.innerHTML = '<div style="color:#aaa">No past sessions found.</div>'; return; }
     let html = '';
-    Object.values(data).sort((a, b) => b.sessionStart.localeCompare(a.sessionStart)).forEach(s => {
+    Object.entries(data).sort((a, b) => b[1].sessionStart.localeCompare(a[1].sessionStart)).forEach(([archKey, s]) => {
       const start = new Date(s.sessionStart).toLocaleString();
       const end = s.sessionEnd ? new Date(s.sessionEnd).toLocaleString() : '?';
       const dateLabel = s.sessionDate || 'Custom Game';
       const playerNames = s.players ? s.players.map(p => p.name || p).filter(Boolean) : [];
       const playerDuprs = s.players ? s.players.map(p => p.dupr || 0) : [];
       html += `<div style="background:#16213e;padding:12px;border-radius:8px;margin-bottom:10px">`;
-      html += `<div style="display:flex;justify-content:space-between;align-items:center">`;
+      html += `<div style="display:flex;justify-content:space-between;align-items:center;gap:6px">`;
       html += `<div style="font-weight:600;color:#4ecca3;font-size:16px">${dateLabel}</div>`;
+      html += `<div style="display:flex;gap:4px">`;
       if (playerNames.length) html += `<button onclick='reopenSession(${JSON.stringify(playerNames)},${JSON.stringify(playerDuprs)})' style="margin:0;padding:4px 10px;font-size:12px;background:#4ecca3;color:#1a1a2e">🔄 Reopen</button>`;
-      html += `</div>`;
+      html += `<button onclick="deletePastSession('${archKey}')" style="margin:0;padding:4px 10px;font-size:12px;background:#e94560">🗑️</button>`;
+      html += `</div></div>`;
       html += `<div style="font-size:12px;color:#aaa">${start} → ${end} · ${s.rounds} round(s) · ${playerNames.length} players</div>`;
       if (s.history) s.history.forEach(h => { html += `<div class="history-entry">${h}</div>`; });
       html += `</div>`;
@@ -874,6 +876,11 @@ function reopenSession(names, duprs) {
   document.getElementById('pastSessions').style.display = 'none';
   document.getElementById('numCourts').value = Math.floor(names.length / 4) || 1;
   renderPlayerList(names, duprs);
+}
+
+function deletePastSession(archKey) {
+  if (!confirm('Delete this past session?')) return;
+  firebase.database().ref(getArchivePath() + '/' + archKey).remove().then(() => showPastSessions());
 }
 
 const dummyNames = ['Bob','Jim','Bill','Jack','Alice','Tom','Sue','Dan','Mike','Lisa','Chris','Emma','Dave','Sara','Pete','Nina','Greg','Jill','Mark','Amy'];
