@@ -262,11 +262,14 @@ function initApp() {
         if (!results) return;
         const items = document.getElementById('sessionListItems');
         const sessions = results.filter(r => r.data && r.data.players && r.data.players.length)
-          .map(r => ({ key: r.key, playerCount: r.data.players.length, round: r.data.round || 1, sessionDate: r.data.sessionDate || r.key }));
+          .map(r => {
+            const name = r.data.sessionName ? r.data.sessionDate + ' — ' + r.data.sessionName : (r.data.sessionDate || r.key);
+            return { key: r.key, playerCount: r.data.players.length, round: r.data.round || 1, label: name };
+          });
         if (!sessions.length) { items.innerHTML = ''; document.getElementById('noSessions').style.display = 'block'; return; }
         items.innerHTML = sessions.map(s =>
           `<div onclick="switchLocation('${s.key}')" style="padding:10px;margin:4px 0;background:#16213e;border-radius:6px;cursor:pointer;display:flex;justify-content:space-between">
-          <span>🏓 ${s.sessionDate}</span><span style="color:#4ecca3">${s.playerCount} players · Round ${s.round}</span></div>`
+          <span>🏓 ${s.label}</span><span style="color:#4ecca3">${s.playerCount} players · Round ${s.round}</span></div>`
         ).join('');
       })
       .catch(() => { document.getElementById('sessionListItems').innerHTML = ''; document.getElementById('noSessions').style.display = 'block'; });
@@ -325,6 +328,7 @@ function startGame() {
   state.pendingResults = {};
   state.sessionStart = new Date().toISOString();
   state.sessionDate = document.getElementById('dateSelect').value || 'Custom Game';
+  state.sessionName = document.getElementById('locationInput').value.trim() || '';
   state.isQuickGame = false;
   document.getElementById('setup').style.display = 'none';
   document.getElementById('game').style.display = 'block';
