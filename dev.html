@@ -274,7 +274,9 @@ function initApp() {
   if (!currentLocation) loadSessionList();
 
   function getArchivePath() { return 'dev-' + currentLocation.toLowerCase().replace(/[^a-z0-9]/g, '') + '/archive'; }
+  window.getArchivePath = getArchivePath;
   function getRrPath() { return 'dev-' + currentLocation.toLowerCase().replace(/[^a-z0-9]/g, '') + '/rr'; }
+  window.getRrPath = getRrPath;
 
   function initDbListener() {
   // Listen for real-time updates from Firebase
