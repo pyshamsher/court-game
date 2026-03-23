@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Pickleball Court Tracker</title>
+<title>Pickleball Court Tracker [DEV]</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: system-ui, sans-serif; background: #1a1a2e; color: #eee; min-height: 100vh; padding: 20px; }
@@ -52,7 +52,7 @@
 </head>
 <body>
 
-<h1>🏓 Pickleball Court Tracker</h1>
+<h1>🏓 Pickleball Court Tracker <span style="color:#ff6b6b;font-size:14px;vertical-align:super">DEV</span></h1>
 
 <div id="lock">
   <div class="lock-box">
@@ -89,10 +89,11 @@
         <button onclick="fetchDuprRatings()" style="margin:0;padding:8px 16px">Fetch</button>
         <button onclick="document.getElementById('duprModal').style.display='none'" style="margin:0;background:#16213e;padding:8px">✕</button>
       </div>
-      <div id="duprStatus" style="font-size:12px;margin-top:6px;color:#aaa;white-space:pre-wrap"></div>
+      <div id="duprStatus" style="font-size:12px;margin-top:6px;color:#aaa;white-space:pre-wrap;max-height:300px;overflow-y:auto"></div>
     </div>
     <button onclick="startGame()">Start Game</button>
     <button onclick="startRandomGame()" style="background:#0f3460">🎲 Quick Game (no history)</button>
+    <button onclick="startRoundRobin()" style="background:#4ecca3;color:#1a1a2e">🔄 Round Robin</button>
     <button onclick="showPastSessions()" style="background:#0f3460">📜 Past Sessions</button>
   </div>
 </div>
@@ -116,6 +117,20 @@
 </div>
 
 <div id="history"></div>
+
+<div id="rrGame" style="display:none;max-width:800px;margin:0 auto;">
+  <div class="round-header">
+    <h2>🔄 Round Robin — Round <span id="rrRoundNum">1</span> of <span id="rrTotalRounds">?</span></h2>
+    <div>
+      <span id="rrSessionInfo" style="font-size:12px;color:#aaa;margin-right:12px"></span>
+      <button onclick="resetRR()">Reset</button>
+    </div>
+  </div>
+  <div id="rrCourts"></div>
+  <div id="rrStandings" style="margin-top:20px"></div>
+  <div id="rrLog" style="margin-top:20px"></div>
+</div>
+
 </div><!-- end #app -->
 
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
@@ -160,7 +175,7 @@ function initApp() {
   appId: "1:899482641607:web:b02e440285628554aa4ae2"
 };
   firebase.initializeApp(firebaseConfig);
-  db = firebase.database().ref('game');
+  db = firebase.database().ref('dev-game');
 
   // Listen for real-time updates from Firebase
   db.on('value', (snapshot) => {
@@ -180,6 +195,7 @@ function initApp() {
   });
   fetchSchedule();
   renderPlayerList(dummyNames.slice(0, 8));
+  listenRR();
 } // end initApp
 
 function saveState() {
@@ -235,7 +251,7 @@ function resetGame() {
   // Archive current session if it has history and is not a quick game
   if (state.history && state.history.length && !state.isQuickGame) {
     const key = (state.sessionDate || 'Custom') + '_' + (state.sessionStart || new Date().toISOString()).replace(/[.#$/\[\]]/g, '_');
-    firebase.database().ref('archive/' + key.replace(/[.#$/\[\]]/g, '_')).set({
+    firebase.database().ref('dev-archive/' + key.replace(/[.#$/\[\]]/g, '_')).set({
       sessionDate: state.sessionDate || 'Custom Game',
       sessionStart: state.sessionStart,
       sessionEnd: new Date().toISOString(),
@@ -501,15 +517,27 @@ function fuzzyMatchPlayer(name, hits) {
     const fn = h.fullName.toLowerCase();
     const fnNorm = norm(h.fullName);
     let score = 0;
+
+    // Exact match
     if (fn === name.toLowerCase()) return h;
+
+    // All tokens present in full name
     const tokensFound = tokens.filter(t => fn.includes(t)).length;
     score += tokensFound * 3;
+
+    // Last name match (strongest signal)
     const hParts = fn.split(/\s+/);
     if (tokens.length > 1 && hParts.length > 1 && hParts[hParts.length - 1] === tokens[tokens.length - 1]) score += 5;
+
+    // First name starts with same chars (Bob/Robert won't match, but partial like "Mike"/"Michael" gets a point)
     if (tokens[0] && hParts[0] && (hParts[0].startsWith(tokens[0]) || tokens[0].startsWith(hParts[0]))) score += 2;
+
+    // Normalized containment
     if (fnNorm.includes(nameNorm) || nameNorm.includes(fnNorm)) score += 2;
+
     if (score > bestScore) { bestScore = score; best = h; }
   }
+  // Require at least last name match or 2+ token matches to avoid false positives
   return bestScore >= 3 ? best : hits[0];
 }
 
@@ -527,6 +555,7 @@ async function fetchDuprRatings() {
   status.style.color = '#aaa';
 
   try {
+    // Login
     const loginRes = await fetch('https://api.dupr.gg/auth/v1.0/login/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -541,24 +570,31 @@ async function fetchDuprRatings() {
 
     // Get logged-in user's own profile for self-match
     let selfName = null, selfRatings = null;
+    // Try login response user object
     const u = loginData.result.user;
     if (u) {
       selfName = u.fullName || u.name || ((u.firstName || '') + ' ' + (u.lastName || '')).trim();
       selfRatings = u.ratings;
+      // If no ratings in user object, try fetching player profile
       if (!selfRatings && u.id) {
         try {
-          const pRes = await fetch(`https://api.dupr.gg/player/v1.0/${u.id}`, { headers: { 'Authorization': 'Bearer ' + token } });
+          const pRes = await fetch(`https://api.dupr.gg/player/v1.0/${u.id}`, {
+            headers: { 'Authorization': 'Bearer ' + token }
+          });
           const pData = await pRes.json();
           if (pData.result) { selfRatings = pData.result.ratings; }
         } catch (e) {}
       }
     }
 
+    // Search each player
     const duprs = getPlayerDuprs();
     let found = 0;
+    // Collect all search results first
     const allResults = [];
     for (let i = 0; i < names.length; i++) {
       status.textContent = `🔄 Looking up ${names[i]}... (${i+1}/${names.length})`;
+      // Check if this player matches the logged-in user
       if (selfName && selfRatings) {
         const norm = s => s.toLowerCase().replace(/[^a-z]/g, '');
         if (norm(names[i]) === norm(selfName) || selfName.toLowerCase().includes(names[i].toLowerCase()) || names[i].toLowerCase().includes(selfName.toLowerCase())) {
@@ -585,15 +621,19 @@ async function fetchDuprRatings() {
         const autoRating = autoMatch?.ratings ? (parseFloat(autoMatch.ratings.doubles) || parseFloat(autoMatch.ratings.singles) || 0) : 0;
         if (autoRating > 0) { duprs[i] = autoRating; found++; }
         allResults.push({ idx: i, name: names[i], hits, autoMatch, autoRating });
-      } catch (e) { allResults.push({ idx: i, name: names[i], hits: [], autoMatch: null, autoRating: 0 }); }
+      } catch (e) { allResults.push({ idx: i, name: names[i], hits: [], autoMatch: null, autoRating: 0, error: e.message }); }
     }
 
+    // Auto-apply confident matches to player list immediately
     renderPlayerList(names, duprs);
+
+    // Show interactive picker for review/correction
     status.style.color = '#4ecca3';
     status.innerHTML = `✅ Auto-filled ${found}/${names.length} players. Review & correct below:`;
     const pickerDiv = document.createElement('div');
     pickerDiv.id = 'duprPicker';
     pickerDiv.style.cssText = 'margin-top:8px;max-height:400px;overflow-y:auto';
+
     const buildSelect = (idx, hits, autoMatch) => {
       let html = `<select data-idx="${idx}" style="background:#16213e;color:#eee;border:1px solid #333;border-radius:4px;padding:4px;font-size:12px;min-width:200px">`;
       html += `<option value="">Skip (${hits.length} results)</option>`;
@@ -607,13 +647,14 @@ async function fetchDuprRatings() {
       html += `</select>`;
       return html;
     };
+
     allResults.forEach(r => {
       const row = document.createElement('div');
       row.style.cssText = 'padding:6px 0;border-bottom:1px solid #1a1a2e;display:flex;align-items:center;gap:6px;flex-wrap:wrap';
       if (r.self) {
         row.innerHTML = `<span style="color:#4ecca3">✅ ${r.name} → self (${duprs[r.idx]})</span>`;
       } else {
-        let html = `<span style="color:#aaa;min-width:90px">${r.name} (${r.hits.length} hits) →</span>`;
+        let html = `<span style="color:#aaa;min-width:90px">${r.name} (${r.hits.length} hits${r.error ? ', ERR: '+r.error : ''}) →</span>`;
         html += buildSelect(r.idx, r.hits, r.autoMatch);
         html += `<input data-ridx="${r.idx}" placeholder="Re-search name" style="width:120px;padding:4px;border-radius:4px;border:1px solid #333;background:#16213e;color:#eee;font-size:12px">`;
         html += `<button data-ridx="${r.idx}" style="padding:4px 8px;font-size:11px;margin:0;background:#0f3460">🔍</button>`;
@@ -656,6 +697,7 @@ async function fetchDuprRatings() {
     };
     pickerDiv.appendChild(applyBtn);
     status.parentNode.insertBefore(pickerDiv, status.nextSibling);
+    // Clear credentials from inputs
     document.getElementById('duprPass').value = '';
   } catch (e) {
     status.style.color = '#ff6b6b';
@@ -667,7 +709,7 @@ function showPastSessions() {
   const list = document.getElementById('pastList');
   list.innerHTML = '<div style="color:#aaa">Loading...</div>';
   document.getElementById('pastSessions').style.display = 'block';
-  firebase.database().ref('archive').once('value', snap => {
+  firebase.database().ref('dev-archive').once('value', snap => {
     const data = snap.val();
     if (!data) { list.innerHTML = '<div style="color:#aaa">No past sessions found.</div>'; return; }
     let html = '';
@@ -769,6 +811,232 @@ function onDateSelect() {
   renderPlayerList(players);
   const courts = Math.floor(players.length / 4);
   document.getElementById('numCourts').value = courts;
+}
+
+// --- Round Robin Mode ---
+let rrState = null;
+let rrDb;
+
+function initRRDb() {
+  if (!rrDb) rrDb = firebase.database().ref('dev-rr');
+}
+
+function startRoundRobin() {
+  const names = getPlayerNames().filter(Boolean);
+  if (names.length < 4) return alert('Need at least 4 players for round robin.');
+  const duprs = getPlayerDuprs();
+  const numCourts = parseInt(document.getElementById('numCourts').value);
+  const hasDupr = duprs.some(d => d > 0);
+
+  let teams;
+  if (hasDupr) {
+    // Balanced pairing: sort by DUPR, pair strongest with weakest
+    const sorted = names.map((_, i) => i).sort((a, b) => (duprs[b] || 0) - (duprs[a] || 0));
+    teams = [];
+    const half = Math.floor(sorted.length / 2);
+    for (let i = 0; i < half; i++)
+      teams.push([sorted[i], sorted[sorted.length - 1 - i]]);
+    // If odd number, pair remaining with strongest unmatched
+    if (sorted.length % 2) teams.push([sorted[half], sorted[0]]);
+  } else {
+    // All possible team pairings
+    teams = [];
+    for (let i = 0; i < names.length; i++)
+      for (let j = i + 1; j < names.length; j++)
+        teams.push([i, j]);
+  }
+
+  // Generate matchups: every team vs every other team (no player plays against themselves)
+  const matchups = [];
+  for (let a = 0; a < teams.length; a++)
+    for (let b = a + 1; b < teams.length; b++) {
+      const ta = teams[a], tb = teams[b];
+      if (ta[0] !== tb[0] && ta[0] !== tb[1] && ta[1] !== tb[0] && ta[1] !== tb[1])
+        matchups.push({ teamA: ta, teamB: tb });
+    }
+
+  // Schedule rounds: each round fills up to numCourts games, no player plays twice per round
+  const rounds = [];
+  const used = new Set();
+  let pool = matchups.map((m, i) => i);
+  while (pool.length) {
+    const round = [];
+    const busyPlayers = new Set();
+    const remaining = [];
+    for (const idx of pool) {
+      const m = matchups[idx];
+      const ps = [...m.teamA, ...m.teamB];
+      if (round.length < numCourts && ps.every(p => !busyPlayers.has(p))) {
+        round.push(idx);
+        ps.forEach(p => busyPlayers.add(p));
+      } else {
+        remaining.push(idx);
+      }
+    }
+    if (!round.length) break; // can't schedule more
+    rounds.push(round);
+    pool = remaining;
+  }
+
+  rrState = {
+    players: names,
+    duprs: duprs,
+    matchups,
+    rounds,
+    currentRound: 0,
+    results: {},
+    log: []
+  };
+
+  initRRDb();
+  document.getElementById('setup').style.display = 'none';
+  document.getElementById('rrGame').style.display = 'block';
+  saveRR();
+  renderRR();
+}
+
+function saveRR() {
+  initRRDb();
+  rrDb.set(rrState);
+}
+
+function renderRR() {
+  if (!rrState) return;
+  const { players, matchups, rounds, currentRound, results } = rrState;
+
+  if (currentRound >= rounds.length) {
+    document.getElementById('rrRoundNum').textContent = 'Complete!';
+    document.getElementById('rrTotalRounds').textContent = rounds.length;
+    document.getElementById('rrCourts').innerHTML = '<div style="text-align:center;color:#4ecca3;font-size:18px;padding:20px">🏆 All rounds complete!</div>';
+    renderRRStandings();
+    renderRRLog();
+    return;
+  }
+
+  document.getElementById('rrRoundNum').textContent = currentRound + 1;
+  document.getElementById('rrTotalRounds').textContent = rounds.length;
+
+  const roundMatchups = rounds[currentRound];
+  let html = '';
+  let allDone = true;
+
+  roundMatchups.forEach((mi, ci) => {
+    const m = matchups[mi];
+    const tA = m.teamA.map(i => players[i]).join(' & ');
+    const tB = m.teamB.map(i => players[i]).join(' & ');
+    const res = results[mi];
+    html += `<div class="court"><h2>Court ${ci + 1}</h2>`;
+    html += `<div class="match">`;
+    html += `<div class="team"><span class="name">${tA}</span></div>`;
+    html += `<div class="vs">VS</div>`;
+    html += `<div class="team"><span class="name">${tB}</span></div>`;
+    if (res) {
+      html += `<div style="text-align:center;color:#4ecca3;margin-top:8px;font-weight:600">🏆 ${res === 'A' ? tA : tB}</div>`;
+      html += `<button onclick="clearRRResult(${mi})" style="background:#0f3460;margin-top:4px;font-size:12px">↩ Change</button>`;
+    } else {
+      allDone = false;
+      html += `<button onclick="recordRRResult(${mi},'A')">🏆 ${tA} Win</button>`;
+      html += `<button onclick="recordRRResult(${mi},'B')" style="background:#0f3460;margin-top:4px">🏆 ${tB} Win</button>`;
+    }
+    html += `</div></div>`;
+  });
+
+  if (allDone && roundMatchups.every(mi => results[mi])) {
+    html += `<div style="text-align:center;margin-top:10px"><button onclick="advanceRRRound()">Next Round →</button></div>`;
+  }
+
+  document.getElementById('rrCourts').innerHTML = html;
+  renderRRStandings();
+  renderRRLog();
+}
+
+function recordRRResult(mi, winner) {
+  rrState.results[mi] = winner;
+  saveRR();
+  renderRR();
+}
+
+function clearRRResult(mi) {
+  delete rrState.results[mi];
+  saveRR();
+  renderRR();
+}
+
+function advanceRRRound() {
+  const { players, matchups, rounds, currentRound, results } = rrState;
+  let logEntry = `<strong>Round ${currentRound + 1}:</strong><br>`;
+  rounds[currentRound].forEach(mi => {
+    const m = matchups[mi];
+    const tA = m.teamA.map(i => players[i]).join(' & ');
+    const tB = m.teamB.map(i => players[i]).join(' & ');
+    const winner = results[mi] === 'A' ? tA : tB;
+    logEntry += `🏆 ${winner} beat ${results[mi] === 'A' ? tB : tA}<br>`;
+  });
+  rrState.log.push(logEntry);
+  rrState.currentRound++;
+  saveRR();
+  renderRR();
+}
+
+function renderRRStandings() {
+  const { players, duprs, matchups, results } = rrState;
+  const stats = players.map((name, i) => ({ name, idx: i, dupr: (duprs && duprs[i]) || 0, wins: 0, losses: 0, played: 0 }));
+  Object.entries(results).forEach(([mi, winner]) => {
+    const m = matchups[parseInt(mi)];
+    const winTeam = winner === 'A' ? m.teamA : m.teamB;
+    const loseTeam = winner === 'A' ? m.teamB : m.teamA;
+    winTeam.forEach(i => { stats[i].wins++; stats[i].played++; });
+    loseTeam.forEach(i => { stats[i].losses++; stats[i].played++; });
+  });
+  stats.sort((a, b) => b.wins - a.wins || a.losses - b.losses);
+  let html = '<h2 style="color:#e94560;margin-bottom:10px">📊 Standings</h2>';
+  html += '<div style="background:#16213e;border-radius:8px;padding:12px">';
+  stats.forEach((s, i) => {
+    const pct = s.played ? Math.round(100 * s.wins / s.played) : 0;
+    const duprTag = s.dupr ? ` <span class="dupr-badge">${s.dupr.toFixed(1)}</span>` : '';
+    html += `<div style="display:flex;justify-content:space-between;padding:6px 8px;${i === 0 && s.wins > 0 ? 'color:#4ecca3;font-weight:700' : ''}">`;
+    html += `<span>${i + 1}. ${s.name}${duprTag}</span>`;
+    html += `<span>${s.wins}W - ${s.losses}L (${pct}%)</span></div>`;
+  });
+  html += '</div>';
+  document.getElementById('rrStandings').innerHTML = html;
+}
+
+function renderRRLog() {
+  if (!rrState.log.length) { document.getElementById('rrLog').innerHTML = ''; return; }
+  let html = '<h2 style="color:#e94560;margin-bottom:10px">History</h2>';
+  rrState.log.slice().reverse().forEach(h => {
+    html += `<div class="history-entry">${h}</div>`;
+  });
+  document.getElementById('rrLog').innerHTML = html;
+}
+
+function resetRR() {
+  if (!confirm('Reset round robin for everyone?')) return;
+  rrState = null;
+  initRRDb();
+  rrDb.remove();
+  document.getElementById('rrGame').style.display = 'none';
+  document.getElementById('setup').style.display = 'block';
+  document.getElementById('rrStandings').innerHTML = '';
+  document.getElementById('rrLog').innerHTML = '';
+}
+
+// Listen for RR state from Firebase
+function listenRR() {
+  initRRDb();
+  rrDb.on('value', snap => {
+    const data = snap.val();
+    if (data && data.players) {
+      rrState = data;
+      rrState.results = rrState.results || {};
+      rrState.log = rrState.log || [];
+      document.getElementById('setup').style.display = 'none';
+      document.getElementById('game').style.display = 'none';
+      document.getElementById('rrGame').style.display = 'block';
+      renderRR();
+    }
+  });
 }
 </script>
 </body>

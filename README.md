@@ -49,9 +49,33 @@ Surge account: mr.shamshersingh@gmail.com
 - 🎲 Quick Game mode — random games with no history saved
 - Dynamic court count with auto-filled dummy names
 - Reset confirmation (affects all connected devices)
+- DUPR ratings — optional manual entry per player, shown as teal badges during games
+- 🔍 Fetch DUPR Ratings — log in with DUPR account to auto-fetch doubles ratings for all players
+- Fuzzy name matching for DUPR lookups (last name priority, prefix matching)
+- 📊 Sort by DUPR — auto-seeds player list by rating (highest = seed 1)
+- Auto-sort after DUPR fetch
+
+## Dev Instance
+- **Live Site:** https://pickleball-tracker-dev.surge.sh
+- **Local File:** `~/court-game/dev.html`
+- **Firebase paths:** `/dev-game`, `/dev-archive`, and `/dev-rr` (isolated from production)
+- Has a `DEV` badge in the header to distinguish from production
+- **Deploy:**
+  ```bash
+  cp ~/court-game/dev.html /tmp/pickleball-dev/index.html && npx surge /tmp/pickleball-dev pickleball-tracker-dev.surge.sh
+  ```
+
+### Dev-Only Features
+- **🔄 Round Robin mode** — generates all valid doubles matchups, schedules into rounds, live standings leaderboard with win/loss/percentage
+- **DUPR ratings** — optional rating field per player in setup, shown as teal badges during games and in standings
+- **📊 Sort by DUPR** — auto-seeds player list by rating (highest = seed 1)
+- **Balanced RR pairing** — when DUPR ratings are entered, teams are formed via snake draft (strongest + weakest) for fair matchups; falls back to all combos if no ratings
+- **📊 Sort by DUPR** — auto-seeds player list by rating (highest = seed 1)
+- **Balanced RR pairing** — when DUPR ratings are entered, teams are formed via snake draft (strongest + weakest) for fair matchups; falls back to all combos if no ratings
 
 ## Files
-- `~/court-game/index.html` — the entire app (single file)
+- `~/court-game/index.html` — the production app (single file)
+- `~/court-game/dev.html` — the dev app (isolated Firebase paths)
 - `~/court-game/README.md` — this file
 
 ## Tech Stack
@@ -80,6 +104,15 @@ Surge account: mr.shamshersingh@gmail.com
 - Each browser session needs to enter the passcode once
 
 ## Changelog
+
+### March 22, 2026
+- **Dev instance** — separate site at pickleball-tracker-dev.surge.sh with isolated Firebase paths (`/dev-game`, `/dev-archive`, `/dev-rr`)
+- **🔄 Round Robin mode** (dev only) — generates all doubles matchups, schedules into rounds, live standings leaderboard
+- **Balanced RR pairing** (dev only) — snake draft team formation when DUPR ratings are entered
+- **DUPR ratings** — optional rating field per player in setup, teal badges shown during games
+- **🔍 Fetch DUPR Ratings** — log in with DUPR account to auto-fetch doubles ratings for all players
+- **Fuzzy name matching** — last name priority, prefix matching for DUPR lookups
+- **📊 Sort by DUPR** — auto-seeds player list by rating; auto-sorts after fetch
 
 ### March 20, 2026
 - **Fixed Google Doc parser** — the exported text has no newlines and paired date headers (e.g. `WED MARCH 25 FRI MARCH 27`) appear side-by-side with all players after the second header. The old parser doubled player counts (~32 instead of 16) and missed the first date entirely.
