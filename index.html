@@ -108,8 +108,9 @@
     <h2>Round <span id="roundNum">1</span></h2>
     <div>
       <span id="sessionInfo" style="font-size:12px;color:#aaa;margin-right:12px"></span>
-      <span id="sessionTimer" onclick="startSessionTimer()" style="font-size:13px;color:#4ecca3;margin-right:6px;font-weight:600;cursor:pointer;background:#0f3460;padding:4px 10px;border-radius:6px" title="Click to set timer">⏱ Set Timer</span>
-      <span onclick="playBuzzer()" style="font-size:11px;color:#aaa;cursor:pointer;margin-right:4px">🔊test</span>
+      <span id="sessionTimer" onclick="startSessionTimer()" style="font-size:16px;color:#4ecca3;margin-right:6px;font-weight:600;cursor:pointer;background:#0f3460;padding:8px 16px;border-radius:8px" title="Click to set timer">⏱ Set Timer</span>
+      <span id="stopTimerBtn" onclick="stopTimer()" style="display:none;font-size:20px;color:#fff;font-weight:700;cursor:pointer;background:#e94560;padding:10px 22px;border-radius:8px;margin-right:6px">⏹ STOP</span>
+      <span onclick="playBuzzer(3)" style="font-size:11px;color:#aaa;cursor:pointer;margin-right:4px">🔊test</span>
       <input id="buzzerVol" type="range" min="0" max="100" value="50" style="width:60px;vertical-align:middle;margin-right:12px" title="Buzzer volume">
       <button onclick="undoRound()" style="background:#0f3460">↩ Undo</button>
       <button onclick="resetGame()">Reset</button>
@@ -292,17 +293,55 @@ function getCourts() {
 
 function fmtDupr(p) { return p.dupr ? ' <span class="dupr-badge">' + p.dupr.toFixed(1) + '</span>' : ''; }
 
-let buzzerAudio = new Audio('https://cdn.freesound.org/previews/536/536420_4921277-lq.mp3');
-buzzerAudio.preload = 'auto';
+var buzzerAudio = null;
+(function() {
+  var sr = 22050, dur = 1.0, samples = sr * dur | 0;
+  var buf = new Float32Array(samples);
+  var bursts = [[0, 0.15], [0.25, 0.4], [0.5, 1.0]];
+  for (var i = 0; i < samples; i++) {
+    var t = i / sr, val = 0;
+    for (var b = 0; b < bursts.length; b++) {
+      if (t >= bursts[b][0] && t < bursts[b][1]) {
+        var env = 1 - (t - bursts[b][0]) / (bursts[b][1] - bursts[b][0]);
+        val = (Math.sin(2 * Math.PI * 2800 * t) > 0 ? 1 : -1) * env * 0.8;
+      }
+    }
+    buf[i] = val;
+  }
+  var numCh = 1, bps = 16, byteRate = sr * numCh * bps / 8;
+  var dataLen = samples * numCh * bps / 8;
+  var header = new ArrayBuffer(44);
+  var v = new DataView(header);
+  function ws(o, s) { for (var i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); }
+  ws(0, 'RIFF'); v.setUint32(4, 36 + dataLen, true); ws(8, 'WAVE');
+  ws(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true);
+  v.setUint16(22, numCh, true); v.setUint32(24, sr, true);
+  v.setUint32(28, byteRate, true); v.setUint16(32, numCh * bps / 8, true);
+  v.setUint16(34, bps, true); ws(36, 'data'); v.setUint32(40, dataLen, true);
+  var pcm = new Int16Array(samples);
+  for (var i = 0; i < samples; i++) pcm[i] = Math.max(-32768, Math.min(32767, buf[i] * 32767));
+  var blob = new Blob([header, pcm.buffer], { type: 'audio/wav' });
+  buzzerAudio = new Audio(URL.createObjectURL(blob));
+  buzzerAudio.preload = 'auto';
+})();
 document.addEventListener('touchstart', function() { buzzerAudio.load(); }, { once: true });
 document.addEventListener('click', function() { buzzerAudio.load(); }, { once: true });
 
-function playBuzzer() {
+let buzzerRepeatTimer = null;
+let buzzerStartTime = 0;
+function playBuzzer(duration) {
+  clearTimeout(buzzerRepeatTimer);
   var vol = (document.getElementById('buzzerVol') ? document.getElementById('buzzerVol').value : 50) / 100;
-  buzzerAudio.volume = vol;
-  buzzerAudio.currentTime = 0;
-  buzzerAudio.play().catch(function(){});
-  try { navigator.vibrate([300, 200, 300, 200, 300]); } catch(e) {}
+  var dur = (duration || 60) * 1000;
+  buzzerStartTime = Date.now();
+  function chimeLoop() {
+    if (Date.now() - buzzerStartTime >= dur) { buzzerRepeatTimer = null; return; }
+    buzzerAudio.volume = vol;
+    buzzerAudio.currentTime = 0;
+    buzzerAudio.play().catch(function(){});
+    buzzerRepeatTimer = setTimeout(chimeLoop, 2000);
+  }
+  chimeLoop();
 }
 
 let timerInterval = null;
@@ -312,7 +351,17 @@ function startSessionTimer() {
   const mins = prompt('Set game timer (minutes):', '15');
   if (!mins || isNaN(mins) || mins <= 0) { document.getElementById('sessionTimer').textContent = '⏱ Set Timer'; return; }
   localTimerEnd = Date.now() + mins * 60000;
+  document.getElementById('stopTimerBtn').style.display = 'inline';
   runTimer();
+}
+function stopTimer() {
+  clearInterval(timerInterval); timerInterval = null;
+  clearTimeout(buzzerRepeatTimer); buzzerRepeatTimer = null;
+  localTimerEnd = null;
+  document.getElementById('sessionTimer').textContent = '⏱ Set Timer';
+  document.getElementById('sessionTimer').style.color = '#4ecca3';
+  document.getElementById('stopTimerBtn').style.display = 'none';
+  if (buzzerAudio) { buzzerAudio.pause(); buzzerAudio.currentTime = 0; }
 }
 function runTimer() {
   clearInterval(timerInterval);
@@ -323,7 +372,7 @@ function runTimer() {
     const m = Math.floor(left / 60), sec = left % 60;
     el.textContent = '⏱ ' + m + ':' + String(sec).padStart(2, '0');
     el.style.color = left <= 60 ? '#e94560' : left <= 180 ? '#f0a500' : '#4ecca3';
-    if (left === 0) { clearInterval(timerInterval); timerInterval = null; el.textContent = '⏱ TIME!'; playBuzzer(); localTimerEnd = null; }
+    if (left === 0) { clearInterval(timerInterval); timerInterval = null; el.textContent = '⏱ TIME!'; playBuzzer(); localTimerEnd = null; document.getElementById('stopTimerBtn').style.display = 'inline'; }
   }
   tick();
   timerInterval = setInterval(tick, 1000);

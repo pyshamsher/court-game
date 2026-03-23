@@ -128,9 +128,23 @@
     <h2>Round <span id="roundNum">1</span></h2>
     <div>
       <span id="sessionInfo" style="font-size:12px;color:#aaa;margin-right:12px"></span>
-      <span id="sessionTimer" onclick="startSessionTimer()" style="font-size:13px;color:#4ecca3;margin-right:6px;font-weight:600;cursor:pointer;background:#0f3460;padding:4px 10px;border-radius:6px" title="Click to set timer">⏱ Set Timer</span>
-      <span onclick="playBuzzer()" style="font-size:11px;color:#aaa;cursor:pointer;margin-right:4px">🔊test</span>
-      <input id="buzzerVol" type="range" min="0" max="100" value="50" style="width:60px;vertical-align:middle;margin-right:12px" title="Buzzer volume">
+      <span id="sessionTimer" onclick="startSessionTimer()" style="font-size:16px;color:#4ecca3;margin-right:6px;font-weight:600;cursor:pointer;background:#0f3460;padding:8px 16px;border-radius:8px" title="Click to set timer">⏱ Set Timer</span>
+      <span id="stopTimerBtn" onclick="stopTimer()" style="display:none;font-size:20px;color:#fff;font-weight:700;cursor:pointer;background:#e94560;padding:10px 22px;border-radius:8px;margin-right:6px">⏹ STOP</span>
+      <span onclick="playBuzzer(3)" style="font-size:11px;color:#aaa;cursor:pointer;margin-right:4px">🔊test</span>
+      <input id="buzzerVol" type="range" min="0" max="100" value="50" style="width:60px;vertical-align:middle;margin-right:4px" title="Buzzer volume">
+      <select id="chimeSelect" style="font-size:11px;background:#1a1a2e;color:#aaa;border:1px solid #333;border-radius:4px;padding:1px 2px;vertical-align:middle;margin-right:12px">
+        <option value="ascending">🎵 Ascending</option>
+        <option value="descending">🎵 Descending</option>
+        <option value="doorbell">🔔 Doorbell</option>
+        <option value="fanfare">🏆 Fanfare</option>
+        <option value="ping">🔔 Ping</option>
+        <option value="triple">🎵 Triple</option>
+        <option value="siren">🚨 Siren</option>
+        <option value="airhorn">📢 Air Horn</option>
+        <option value="whistle">🏁 Whistle</option>
+        <option value="alarm">⏰ Alarm</option>
+        <option value="layered">🔊 Layered</option>
+      </select>
       <button onclick="undoRound()" style="background:#0f3460">↩ Undo</button>
       <button onclick="resetGame()">Reset</button>
       <button onclick="endSession()" style="background:#e94560">🏁 End Session</button>
@@ -431,17 +445,102 @@ function getCourts() {
 function fmtDupr(p) { return p.dupr ? ' <span class="dupr-badge">' + p.dupr.toFixed(1) + '</span>' : ''; }
 
 let timerInterval = null;
-let buzzerAudio = new Audio('https://cdn.freesound.org/previews/536/536420_4921277-lq.mp3');
-buzzerAudio.preload = 'auto';
-document.addEventListener('touchstart', function() { buzzerAudio.load(); }, { once: true });
-document.addEventListener('click', function() { buzzerAudio.load(); }, { once: true });
+let buzzerCtx = null;
+function ensureBuzzerCtx() {
+  if (!buzzerCtx) buzzerCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (buzzerCtx.state === 'suspended') buzzerCtx.resume();
+  return buzzerCtx;
+}
+document.addEventListener('touchstart', function() { ensureBuzzerCtx(); Object.values(buzzerWavs).forEach(function(a){a.load();}); }, { once: true });
+document.addEventListener('click', function() { ensureBuzzerCtx(); Object.values(buzzerWavs).forEach(function(a){a.load();}); }, { once: true });
 
-function playBuzzer() {
+function makeWav(sr, durSec, genFn) {
+  var samples = sr * durSec | 0, buf = new Float32Array(samples);
+  for (var i = 0; i < samples; i++) buf[i] = genFn(i / sr);
+  var bps = 16, dataLen = samples * bps / 8;
+  var h = new ArrayBuffer(44), v = new DataView(h);
+  function ws(o,s){for(var i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i));}
+  ws(0,'RIFF');v.setUint32(4,36+dataLen,true);ws(8,'WAVE');ws(12,'fmt ');
+  v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);
+  v.setUint32(24,sr,true);v.setUint32(28,sr*bps/8,true);v.setUint16(32,bps/8,true);
+  v.setUint16(34,bps,true);ws(36,'data');v.setUint32(40,dataLen,true);
+  var pcm = new Int16Array(samples);
+  for (var i = 0; i < samples; i++) pcm[i] = Math.max(-32768,Math.min(32767,buf[i]*32767));
+  return new Audio(URL.createObjectURL(new Blob([h,pcm.buffer],{type:'audio/wav'})));
+}
+function sq(t,f){return Math.sin(2*Math.PI*f*t)>0?1:-1;}
+function si(t,f){return Math.sin(2*Math.PI*f*t);}
+function saw(t,f){return 2*(t*f-Math.floor(t*f+0.5));}
+function env(t,s,e){return t>=s&&t<e?1-(t-s)/(e-s):0;}
+function envFlat(t,s,e){return t>=s&&t<e?1:0;}
+
+var buzzerWavs = {};
+(function(){
+  var sr = 22050;
+  // Gentle chimes (sine)
+  var noteChimes = {
+    ascending:[[523,0],[659,0.15],[784,0.3],[1047,0.45]],
+    descending:[[1047,0],[784,0.15],[659,0.3],[523,0.45]],
+    doorbell:[[659,0],[523,0.3]],
+    fanfare:[[392,0],[523,0.12],[659,0.24],[784,0.36],[1047,0.48]],
+    ping:[[1047,0]],
+    triple:[[523,0],[523,0.2],[784,0.4]]
+  };
+  Object.keys(noteChimes).forEach(function(k){
+    var notes=noteChimes[k];
+    buzzerWavs[k]=makeWav(sr,1.0,function(t){
+      var v=0;
+      notes.forEach(function(n){var s=n[1],d=k==='ping'?0.8:0.3;v+=si(t,n[0])*env(t,s,s+d)*0.7;});
+      return v;
+    });
+  });
+  // Whistle
+  buzzerWavs.whistle=makeWav(sr,1.0,function(t){
+    var v=0;
+    [[0,0.15],[0.25,0.4],[0.5,1.0]].forEach(function(p){v+=sq(t,2800)*env(t,p[0],p[1])*0.8;});
+    return v;
+  });
+  // Siren
+  buzzerWavs.siren=makeWav(sr,1.0,function(t){
+    var f=t<0.5?600+1200*t:1800-1200*t;
+    return saw(t,f)*0.8;
+  });
+  // Air horn
+  buzzerWavs.airhorn=makeWav(sr,1.2,function(t){
+    return (saw(t,220)+saw(t,277)+saw(t,330)+saw(t,440))*0.2;
+  });
+  // Alarm
+  buzzerWavs.alarm=makeWav(sr,1.0,function(t){
+    var v=0;
+    [[0,0.2,1500],[0.25,0.45,1800],[0.5,0.7,1500],[0.75,0.95,1800]].forEach(function(p){
+      v+=sq(t,p[2])*env(t,p[0],p[1])*0.8;
+    });
+    return v;
+  });
+  // Layered
+  buzzerWavs.layered=makeWav(sr,0.8,function(t){
+    return (sq(t,440)+sq(t,880)+sq(t,1760))*env(t,0,0.8)*0.3;
+  });
+})();
+
+let buzzerRepeatTimer = null;
+let buzzerStartTime = 0;
+function playBuzzer(duration) {
+  clearTimeout(buzzerRepeatTimer);
   var vol = (document.getElementById('buzzerVol') ? document.getElementById('buzzerVol').value : 50) / 100;
-  buzzerAudio.volume = vol;
-  buzzerAudio.currentTime = 0;
-  buzzerAudio.play().catch(function(){});
-  try { navigator.vibrate([300, 200, 300, 200, 300]); } catch(e) {}
+  var dur = (duration || 60) * 1000;
+  var sel = document.getElementById('chimeSelect');
+  var type = sel ? sel.value : 'whistle';
+  var audio = buzzerWavs[type] || buzzerWavs.whistle;
+  buzzerStartTime = Date.now();
+  function chimeLoop() {
+    if (Date.now() - buzzerStartTime >= dur) { buzzerRepeatTimer = null; return; }
+    audio.volume = vol;
+    audio.currentTime = 0;
+    audio.play().catch(function(){});
+    buzzerRepeatTimer = setTimeout(chimeLoop, 2000);
+  }
+  chimeLoop();
 }
 
 let localTimerEnd = null;
@@ -451,7 +550,20 @@ function startSessionTimer() {
   const mins = prompt('Set game timer (minutes):', '15');
   if (!mins || isNaN(mins) || mins <= 0) { document.getElementById('sessionTimer').textContent = '⏱ Set Timer'; return; }
   localTimerEnd = Date.now() + mins * 60000;
+  document.getElementById('stopTimerBtn').style.display = 'inline';
   runTimer();
+}
+function stopTimer() {
+  clearInterval(timerInterval); timerInterval = null;
+  clearTimeout(buzzerRepeatTimer); buzzerRepeatTimer = null;
+  localTimerEnd = null;
+  document.getElementById('sessionTimer').textContent = '⏱ Set Timer';
+  document.getElementById('sessionTimer').style.color = '#4ecca3';
+  document.getElementById('stopTimerBtn').style.display = 'none';
+  var sel = document.getElementById('chimeSelect');
+  var type = sel ? sel.value : 'whistle';
+  var audio = buzzerWavs[type] || buzzerWavs.whistle;
+  if (audio) { audio.pause(); audio.currentTime = 0; }
 }
 function runTimer() {
   clearInterval(timerInterval);
@@ -462,7 +574,7 @@ function runTimer() {
     const m = Math.floor(left / 60), sec = left % 60;
     el.textContent = '⏱ ' + m + ':' + String(sec).padStart(2, '0');
     el.style.color = left <= 60 ? '#e94560' : left <= 180 ? '#f0a500' : '#4ecca3';
-    if (left === 0) { clearInterval(timerInterval); timerInterval = null; el.textContent = '⏱ TIME!'; playBuzzer(); localTimerEnd = null; }
+    if (left === 0) { clearInterval(timerInterval); timerInterval = null; el.textContent = '⏱ TIME!'; playBuzzer(); localTimerEnd = null; document.getElementById('stopTimerBtn').style.display = 'inline'; }
   }
   tick();
   timerInterval = setInterval(tick, 1000);
