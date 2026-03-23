@@ -235,6 +235,7 @@ function initApp() {
 } // end initApp
 
 function saveState() {
+  if (!db) return;
   db.set(state).then(() => {
     document.getElementById('syncStatus').textContent = '✅ Synced — all devices see the same game';
   }).catch(() => {
@@ -243,6 +244,7 @@ function saveState() {
 }
 
 function startGame() {
+  if (!db) return alert('Enter a session name first.');
   const names = getPlayerNames();
   const duprs = getPlayerDuprs();
   const numCourts = parseInt(document.getElementById('numCourts').value);
@@ -263,6 +265,7 @@ function startGame() {
 }
 
 function startRandomGame() {
+  if (!db) return alert('Enter a session name first.');
   const names = getPlayerNames();
   const duprs = getPlayerDuprs();
   const numCourts = parseInt(document.getElementById('numCourts').value);
