@@ -36,7 +36,7 @@
   .history-entry { background: #16213e; padding: 10px 14px; border-radius: 8px; margin-bottom: 6px; font-size: 13px; color: #ccc; }
   .sync-status { text-align: center; font-size: 12px; color: #4ecca3; margin-bottom: 10px; }
   #lock { display: flex; justify-content: center; align-items: center; min-height: 60vh; }
-  #lock .lock-box { background: #16213e; padding: 30px; border-radius: 12px; text-align: center; }
+  #lock .lock-box { background: #16213e; padding: 30px; border-radius: 12px; text-align: center; max-width: 400px; width: 90%; }
   #lock input { padding: 10px; border-radius: 8px; border: none; background: #0f3460; color: #eee; font-size: 16px; text-align: center; width: 200px; margin-top: 10px; }
   #lock .error { color: #ff6b6b; font-size: 13px; margin-top: 8px; }
   #app { display: none; }
@@ -57,43 +57,45 @@
 <div id="lock">
   <div class="lock-box">
     <label style="font-weight:600;font-size:16px">🔒 Enter Passcode</label><br>
-    <input type="password" id="passcodeInput" placeholder="Passcode" onkeydown="if(event.key==='Enter')checkPasscode()">
+    <small style="color:#aaa;display:block;margin-bottom:8px">Enter passcode to continue.</small>
+    <input type="password" id="passcodeInput" placeholder="Passcode" onkeydown="if(event.key==='Enter')checkPasscode()" style="margin-bottom:8px">
     <br><button onclick="checkPasscode()">Enter</button>
     <div class="error" id="lockError"></div>
+    <div id="adminPanel" style="display:none;margin-top:16px;border-top:1px solid #333;padding-top:16px;text-align:left">
+      <label style="font-weight:600;font-size:14px">🔧 Create New Session</label><br>
+      <div style="display:flex;gap:6px;margin-top:8px">
+        <input type="text" id="newSessionCode" placeholder="New session passcode" onkeydown="if(event.key==='Enter')createSession()" style="flex:1;text-align:left">
+        <button onclick="createSession()" style="margin:0;padding:8px 14px;background:#4ecca3;color:#1a1a2e;font-weight:700">Create</button>
+      </div>
+      <div id="existingSessions" style="margin-top:12px;font-size:13px;color:#aaa"></div>
+      <div style="margin-top:14px;border-top:1px solid #333;padding-top:10px">
+        <label style="font-size:13px;color:#aaa">Change admin passcode:</label>
+        <div style="display:flex;gap:6px;margin-top:4px">
+          <input type="text" id="newAdminCode" placeholder="New admin passcode" style="flex:1;text-align:left">
+          <button onclick="changeAdminCode()" style="margin:0;padding:8px 12px;font-size:12px">Save</button>
+        </div>
+        <div id="adminCodeMsg" style="font-size:12px;margin-top:4px;color:#4ecca3"></div>
+      </div>
+    </div>
   </div>
 </div>
 
 <div id="app">
-<div class="sync-status" id="syncStatus">🔄 Select or create a session</div>
-
-<div id="sessionPicker" style="margin-bottom:12px">
-  <div style="display:flex;gap:8px;margin-bottom:10px">
-    <button onclick="document.getElementById('newSessionForm').style.display='block';document.getElementById('sessionList').style.display='none'" style="flex:1;padding:10px;background:#4ecca3;color:#1a1a2e;font-weight:700">➕ New Session</button>
-    <button onclick="loadSessionList();document.getElementById('newSessionForm').style.display='none'" style="flex:1;padding:10px;background:#0f3460">📋 Join Session</button>
-  </div>
-  <div id="newSessionForm" style="display:none;background:#0f3460;padding:12px;border-radius:8px;margin-bottom:8px">
-    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-      <input id="sessionDate" type="date" style="padding:8px;border-radius:8px;border:none;background:#16213e;color:#eee;font-size:14px">
-      <input id="locationInput" placeholder="Group name (optional)" onkeydown="if(event.key==='Enter')switchLocation()" style="padding:8px;border-radius:8px;border:none;background:#16213e;color:#eee;font-size:14px;flex:1">
-      <button onclick="switchLocation()" style="margin:0;padding:8px 16px">Start</button>
-    </div>
-  </div>
-  <div id="sessionList" style="display:none;background:#0f3460;padding:12px;border-radius:8px">
-    <div id="sessionListItems" style="max-height:250px;overflow-y:auto"></div>
-    <div id="noSessions" style="display:none;color:#aaa;padding:8px">No active sessions found.</div>
-  </div>
-  <span id="locationLabel" style="color:#4ecca3;font-size:13px"></span>
-</div>
+<div class="sync-status" id="syncStatus">🔄 Connecting to server...</div>
 
 <div id="setup">
   <div class="setup-form">
     <label>Load players from schedule:</label>
+    <div style="display:flex;gap:6px;margin-bottom:8px;align-items:center">
+      <input type="text" id="docUrlInput" placeholder="Paste Google Doc URL or ID" style="flex:1;padding:8px;border-radius:8px;border:none;background:#0f3460;color:#eee;font-size:13px">
+      <button onclick="saveDocUrl()" style="margin:0;padding:8px 12px;font-size:12px">Set</button>
+    </div>
     <select id="dateSelect" onchange="onDateSelect()" style="width:100%;padding:8px;border-radius:8px;border:none;background:#0f3460;color:#eee;font-size:14px;margin-bottom:12px">
       <option value="">-- Select a date --</option>
     </select>
     <button onclick="fetchSchedule()" style="background:#0f3460;margin-bottom:12px">🔄 Refresh Schedule</button>
-    <label>Number of Courts:</label>
-    <input type="number" id="numCourts" min="1" value="2" onchange="updateDummyNames()" oninput="updateDummyNames()" style="width:80px;padding:8px;border-radius:8px;border:none;background:#0f3460;color:#eee;font-size:14px;margin-bottom:12px">
+    <label>Court Numbers (comma-separated, e.g. 3, 5, 7):</label>
+    <input type="text" id="courtNumbers" value="1, 2" oninput="updateDummyNames()" style="width:200px;padding:8px;border-radius:8px;border:none;background:#0f3460;color:#eee;font-size:14px;margin-bottom:12px">
     <label>Players (drag to reorder, edit if needed):</label>
     <small>First player = Seed 1 (best). Total players must equal courts × 4.</small>
     <div id="playerList" style="margin-bottom:12px"></div>
@@ -108,12 +110,14 @@
         <button onclick="fetchDuprRatings()" style="margin:0;padding:8px 16px">Fetch</button>
         <button onclick="document.getElementById('duprModal').style.display='none'" style="margin:0;background:#16213e;padding:8px">✕</button>
       </div>
-      <div id="duprStatus" style="font-size:12px;margin-top:6px;color:#aaa;white-space:pre-wrap;max-height:300px;overflow-y:auto"></div>
+      <div id="duprStatus" style="font-size:12px;margin-top:6px;color:#aaa;white-space:pre-wrap"></div>
     </div>
-    <button onclick="startGame()">Start Game</button>
-    <button onclick="startRandomGame()" style="background:#0f3460">🎲 Quick Game (no history)</button>
-    <button onclick="startRoundRobin()" style="background:#4ecca3;color:#1a1a2e">🔄 Round Robin</button>
+    <div style="display:flex;gap:8px;margin:10px 0">
+      <button onclick="startGame()" style="flex:1">▶ Start Classic</button>
+      <button onclick="startGame(true)" style="flex:1;background:#4ecca3;color:#1a1a2e;font-weight:700">📈 Start with DUPR Sim</button>
+    </div>
     <button onclick="showPastSessions()" style="background:#0f3460">📜 Past Sessions</button>
+    <button onclick="switchSession()" style="background:#0f3460">🔑 Switch Session</button>
   </div>
 </div>
 
@@ -130,175 +134,167 @@
       <span id="sessionInfo" style="font-size:12px;color:#aaa;margin-right:12px"></span>
       <span id="sessionTimer" onclick="startSessionTimer()" style="font-size:16px;color:#4ecca3;margin-right:6px;font-weight:600;cursor:pointer;background:#0f3460;padding:8px 16px;border-radius:8px" title="Click to set timer">⏱ Set Timer</span>
       <span id="stopTimerBtn" onclick="stopTimer()" style="display:none;font-size:20px;color:#fff;font-weight:700;cursor:pointer;background:#e94560;padding:10px 22px;border-radius:8px;margin-right:6px">⏹ STOP</span>
-      <span onclick="playBuzzer(3)" style="font-size:11px;color:#aaa;cursor:pointer;margin-right:4px">🔊test</span>
-      <input id="buzzerVol" type="range" min="0" max="100" value="50" style="width:60px;vertical-align:middle;margin-right:4px" title="Buzzer volume">
-      <select id="chimeSelect" style="font-size:11px;background:#1a1a2e;color:#aaa;border:1px solid #333;border-radius:4px;padding:1px 2px;vertical-align:middle;margin-right:12px">
-        <option value="ascending">🎵 Ascending</option>
-        <option value="descending">🎵 Descending</option>
-        <option value="doorbell">🔔 Doorbell</option>
-        <option value="fanfare">🏆 Fanfare</option>
-        <option value="ping">🔔 Ping</option>
-        <option value="triple">🎵 Triple</option>
-        <option value="siren">🚨 Siren</option>
-        <option value="airhorn">📢 Air Horn</option>
-        <option value="whistle">🏁 Whistle</option>
-        <option value="alarm">⏰ Alarm</option>
-        <option value="layered">🔊 Layered</option>
-      </select>
       <button onclick="undoRound()" style="background:#0f3460">↩ Undo</button>
       <button onclick="resetGame()">Reset</button>
       <button onclick="endSession()" style="background:#e94560">🏁 End Session</button>
+      <button onclick="switchSession()" style="background:#0f3460;font-size:11px">🔑 Switch Session</button>
     </div>
   </div>
   <div id="courts"></div>
+  <div id="duprSummary"></div>
 </div>
 
 <div id="history"></div>
-
-<div id="rrGame" style="display:none;max-width:800px;margin:0 auto;">
-  <div class="round-header">
-    <h2>🔄 Round Robin — Round <span id="rrRoundNum">1</span> of <span id="rrTotalRounds">?</span></h2>
-    <div>
-      <span id="rrSessionInfo" style="font-size:12px;color:#aaa;margin-right:12px"></span>
-      <button onclick="resetRR()">Reset</button>
-    </div>
-  </div>
-  <div id="rrCourts"></div>
-  <div id="rrStandings" style="margin-top:20px"></div>
-  <div id="rrLog" style="margin-top:20px"></div>
-</div>
-
 </div><!-- end #app -->
 
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
 <script>
-// --- Passcode Protection ---
-const PASSCODE = 'pickle2026';
+// --- DUPR CORS Proxy ---
+const DUPR_PROXY = 'https://dupr-proxy.mr-shamshersingh.workers.dev';
+function duprUrl(path) { return DUPR_PROXY + path; }
 
-function checkPasscode() {
-  const input = document.getElementById('passcodeInput').value;
-  if (input === PASSCODE) {
-    sessionStorage.setItem('pb_auth', 'true');
-    unlock();
-  } else {
-    document.getElementById('lockError').textContent = 'Wrong passcode. Try again.';
-  }
+// --- Session & Admin ---
+const DEFAULT_ADMIN_CODE = 'adminpickle2026';
+let ADMIN_CODE = null;
+
+function loadAdminCode() {
+  return getDb().ref('dev-config/adminCode').once('value').then(snap => {
+    ADMIN_CODE = snap.val() || DEFAULT_ADMIN_CODE;
+  });
 }
 
-function unlock() {
+function changeAdminCode() {
+  const val = document.getElementById('newAdminCode').value.trim();
+  if (!val || val.length < 4) { document.getElementById('adminCodeMsg').textContent = 'Must be at least 4 characters.'; return; }
+  getDb().ref('dev-config/adminCode').set(val).then(() => {
+    ADMIN_CODE = val;
+    document.getElementById('newAdminCode').value = '';
+    document.getElementById('adminCodeMsg').textContent = '✅ Admin passcode updated.';
+  });
+}
+let sessionKey = '';
+let fbApp = null;
+
+function getDb() {
+  if (!fbApp) {
+    fbApp = firebase.initializeApp({
+      apiKey: "AIzaSyD4C8latdB9eZxVRvk41t_YsZFVrUDFNHA",
+      authDomain: "pickleball-tracker-2ce69.firebaseapp.com",
+      databaseURL: "https://pickleball-tracker-2ce69-default-rtdb.firebaseio.com",
+      projectId: "pickleball-tracker-2ce69",
+      storageBucket: "pickleball-tracker-2ce69.firebasestorage.app",
+      messagingSenderId: "899482641607",
+      appId: "1:899482641607:web:b02e440285628554aa4ae2"
+    });
+  }
+  return firebase.database();
+}
+
+function checkPasscode() {
+  const input = document.getElementById('passcodeInput').value.trim();
+  if (!input) { document.getElementById('lockError').textContent = 'Enter a passcode.'; return; }
+  document.getElementById('lockError').textContent = 'Checking...';
+  const proceed = () => {
+    if (input === ADMIN_CODE) {
+      document.getElementById('lockError').textContent = '';
+      document.getElementById('adminPanel').style.display = 'block';
+      loadExistingSessions();
+      return;
+    }
+    const key = input.toLowerCase().replace(/[^a-z0-9]/g, '');
+    getDb().ref('dev-sessions/' + key).once('value').then(snap => {
+      if (snap.exists()) {
+        sessionKey = key;
+        sessionStorage.setItem('pb_session', input);
+        doUnlock();
+      } else {
+        document.getElementById('lockError').textContent = 'Session not found. Check the passcode or ask your organizer.';
+      }
+    }).catch(() => {
+      document.getElementById('lockError').textContent = 'Connection error. Try again.';
+    });
+  };
+  if (ADMIN_CODE === null) loadAdminCode().then(proceed);
+  else proceed();
+}
+
+function loadExistingSessions() {
+  getDb().ref('dev-sessions').once('value').then(snap => {
+    const data = snap.val();
+    const el = document.getElementById('existingSessions');
+    if (!data) { el.innerHTML = '<div style="color:#aaa;margin-top:8px">No sessions yet.</div>'; return; }
+    el.innerHTML = '<div style="margin-top:8px"><b style="color:#eee">Active sessions:</b>' +
+      Object.entries(data).map(([k, v]) =>
+        '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #333">' +
+        '<span style="color:#eee;cursor:pointer" onclick="joinFromAdmin(\'' + k + '\',\'' + (v.name||k).replace(/'/g,"\\'") + '\')">' + (v.name || k) +
+        ' <small style="color:#666">' + (v.created ? '· ' + new Date(v.created).toLocaleDateString() : '') + '</small></span>' +
+        '<button onclick="deleteSession(\'' + k + '\',\'' + (v.name||k).replace(/'/g,"\\'") + '\')" style="background:#e94560;padding:2px 8px;font-size:11px;margin:0">✕</button>' +
+        '</div>'
+      ).join('') + '</div>';
+  }).catch(() => {
+    document.getElementById('existingSessions').innerHTML = '<div style="color:#ff6b6b">Failed to load sessions.</div>';
+  });
+}
+
+function joinFromAdmin(key, name) {
+  sessionKey = key;
+  sessionStorage.setItem('pb_session', name);
+  doUnlock();
+}
+
+function deleteSession(key, name) {
+  if (!confirm('Delete session "' + name + '"?')) return;
+  getDb().ref('dev-sessions/' + key).remove().then(() => loadExistingSessions());
+}
+
+function createSession() {
+  const input = document.getElementById('newSessionCode').value.trim();
+  if (!input) return;
+  const key = input.toLowerCase().replace(/[^a-z0-9]/g, '');
+  if (key === ADMIN_CODE.toLowerCase().replace(/[^a-z0-9]/g, '')) { alert('Cannot use admin code as session name.'); return; }
+  getDb().ref('dev-sessions/' + key).set({ name: input, created: new Date().toISOString() }).then(() => {
+    sessionKey = key;
+    sessionStorage.setItem('pb_session', input);
+    doUnlock();
+  });
+}
+
+function doUnlock() {
   document.getElementById('lock').style.display = 'none';
   document.getElementById('app').style.display = 'block';
+  document.getElementById('syncStatus').textContent = '🔄 Connecting...';
   initApp();
 }
 
-// Auto-unlock if already authenticated this session
-if (sessionStorage.getItem('pb_auth') === 'true') {
-  document.addEventListener('DOMContentLoaded', unlock);
+// Auto-unlock if session exists
+if (sessionStorage.getItem('pb_session')) {
+  document.addEventListener('DOMContentLoaded', function() {
+    const saved = sessionStorage.getItem('pb_session');
+    if (!saved) return;
+    const key = saved.toLowerCase().replace(/[^a-z0-9]/g, '');
+    getDb().ref('dev-sessions/' + key).once('value').then(snap => {
+      if (snap.exists()) { sessionKey = key; doUnlock(); }
+      else { sessionStorage.removeItem('pb_session'); }
+    });
+  });
 }
 
 // --- App ---
 let state = { players: [], round: 1, history: [], pendingResults: {}, prevState: null };
 let db;
 
+function switchSession() {
+  if (!confirm('Switch to a different session?')) return;
+  if (db) db.off();
+  sessionStorage.removeItem('pb_session');
+  location.reload();
+}
+
 function initApp() {
-  const firebaseConfig = {
-  apiKey: "AIzaSyD4C8latdB9eZxVRvk41t_YsZFVrUDFNHA",
-  authDomain: "pickleball-tracker-2ce69.firebaseapp.com",
-  databaseURL: "https://pickleball-tracker-2ce69-default-rtdb.firebaseio.com",
-  projectId: "pickleball-tracker-2ce69",
-  storageBucket: "pickleball-tracker-2ce69.firebasestorage.app",
-  messagingSenderId: "899482641607",
-  appId: "1:899482641607:web:b02e440285628554aa4ae2"
-};
-  firebase.initializeApp(firebaseConfig);
-  let currentLocation = sessionStorage.getItem('pkLocation') || '';
-  document.getElementById('sessionDate').value = new Date().toISOString().slice(0, 10);
-  if (currentLocation) {
-    const parts = currentLocation.split('|');
-    if (parts.length === 2) { document.getElementById('sessionDate').value = parts[0]; document.getElementById('locationInput').value = parts[1]; }
-    else document.getElementById('locationInput').value = currentLocation;
-    document.getElementById('locationLabel').textContent = '✅ ' + currentLocation.replace('|', ' — ');
-    db = firebase.database().ref('dev-' + currentLocation.toLowerCase().replace(/[^a-z0-9]/g, '') + '/game');
-    initDbListener();
-  }
+  getDb();
+  db = firebase.database().ref('dev-' + sessionKey + '/game');
 
-  window.switchLocation = function(sessionKey) {
-    let date, name;
-    if (sessionKey) {
-      const parts = sessionKey.split('|');
-      date = parts[0]; name = parts[1] || '';
-      document.getElementById('sessionDate').value = date;
-      document.getElementById('locationInput').value = name;
-    } else {
-      date = document.getElementById('sessionDate').value;
-      name = document.getElementById('locationInput').value.trim();
-    }
-    if (!date) return alert('Select a date.');
-    currentLocation = name ? date + '|' + name : date;
-    const key = currentLocation.toLowerCase().replace(/[^a-z0-9]/g, '');
-    sessionStorage.setItem('pkLocation', currentLocation);
-    document.getElementById('locationLabel').textContent = '🏷️ ' + date + (name ? ' — ' + name : '') + '  ';
-    const changeBtn = document.createElement('a');
-    changeBtn.textContent = '(change)';
-    changeBtn.style.cssText = 'color:#e94560;cursor:pointer;font-size:12px';
-    changeBtn.onclick = () => { sessionStorage.removeItem('pkLocation'); location.reload(); };
-    document.getElementById('locationLabel').appendChild(changeBtn);
-    document.getElementById('syncStatus').textContent = '🔄 Connecting to server...';
-    document.getElementById('sessionPicker').querySelector('#newSessionForm').style.display = 'none';
-    document.getElementById('sessionList').style.display = 'none';
-    try { document.getElementById('sessionPicker').children[0].style.display = 'none'; } catch(e) {}
-    if (db) { db.off(); db = null; }
-    if (rrDb) { rrDb.off(); rrDb = null; }
-    db = firebase.database().ref('dev-' + key + '/game');
-    document.getElementById('setup').style.display = 'block';
-    document.getElementById('game').style.display = 'none';
-    initDbListener();
-    listenRR();
-  }
-
-  // Load active sessions list
-  window.loadSessionList = function() {
-    document.getElementById('sessionList').style.display = 'block';
-    document.getElementById('sessionListItems').innerHTML = '<div style="color:#aaa;padding:8px">Loading...</div>';
-    document.getElementById('noSessions').style.display = 'none';
-    // Use shallow REST query to avoid downloading all data
-    fetch('https://pickleball-tracker-2ce69-default-rtdb.firebaseio.com/.json?shallow=true')
-      .then(r => r.json())
-      .then(keys => {
-        if (!keys) { document.getElementById('sessionListItems').innerHTML = ''; document.getElementById('noSessions').style.display = 'block'; return; }
-        const devKeys = Object.keys(keys).filter(k => k.startsWith('dev-'));
-        if (!devKeys.length) { document.getElementById('sessionListItems').innerHTML = ''; document.getElementById('noSessions').style.display = 'block'; return; }
-        // Fetch just the game node for each dev key
-        const promises = devKeys.map(k =>
-          firebase.database().ref(k + '/game').once('value').then(snap => ({ key: k.replace('dev-', ''), data: snap.val() }))
-        );
-        return Promise.all(promises);
-      })
-      .then(results => {
-        if (!results) return;
-        const items = document.getElementById('sessionListItems');
-        const sessions = results.filter(r => r.data && r.data.players && r.data.players.length)
-          .map(r => {
-            const name = r.data.sessionName ? r.data.sessionDate + ' — ' + r.data.sessionName : (r.data.sessionDate || r.key);
-            return { key: r.key, playerCount: r.data.players.length, round: r.data.round || 1, label: name };
-          });
-        if (!sessions.length) { items.innerHTML = ''; document.getElementById('noSessions').style.display = 'block'; return; }
-        items.innerHTML = sessions.map(s =>
-          `<div onclick="switchLocation('${s.key}')" style="padding:10px;margin:4px 0;background:#16213e;border-radius:6px;cursor:pointer;display:flex;justify-content:space-between">
-          <span>🏓 ${s.label}</span><span style="color:#4ecca3">${s.playerCount} players · Round ${s.round}</span></div>`
-        ).join('');
-      })
-      .catch(() => { document.getElementById('sessionListItems').innerHTML = ''; document.getElementById('noSessions').style.display = 'block'; });
-  }
-  if (!currentLocation) loadSessionList();
-
-  function getArchivePath() { return 'dev-' + currentLocation.toLowerCase().replace(/[^a-z0-9]/g, '') + '/archive'; }
-  window.getArchivePath = getArchivePath;
-  function getRrPath() { return 'dev-' + currentLocation.toLowerCase().replace(/[^a-z0-9]/g, '') + '/rr'; }
-  window.getRrPath = getRrPath;
-
-  function initDbListener() {
   // Listen for real-time updates from Firebase
   db.on('value', (snapshot) => {
   const data = snapshot.val();
@@ -313,61 +309,49 @@ function initApp() {
     document.getElementById('setup').style.display = 'block';
     document.getElementById('game').style.display = 'none';
   }
-  document.getElementById('syncStatus').textContent = '✅ Connected — live sync active';
+  updateSyncStatus('✅ Connected');
   });
-  }
-  if (currentLocation) initDbListener();
+  initDocInput();
   fetchSchedule();
   renderPlayerList(dummyNames.slice(0, 8));
-  listenRR();
 } // end initApp
 
+function updateSyncStatus(msg) {
+  const el = document.getElementById('syncStatus');
+  if (state.sessionDate && state.sessionDate !== 'Custom Game') {
+    el.innerHTML = '<span style="font-size:18px;font-weight:700;color:#4ecca3">📅 ' + state.sessionDate + '</span>';
+  } else {
+    el.textContent = '';
+  }
+}
+
 function saveState() {
-  if (!db) return;
   db.set(state).then(() => {
-    document.getElementById('syncStatus').textContent = '✅ Synced — all devices see the same game';
+    updateSyncStatus('✅ Synced');
   }).catch(() => {
-    document.getElementById('syncStatus').textContent = '❌ Sync failed — check connection';
+    updateSyncStatus('❌ Sync failed');
   });
 }
 
-function startGame() {
-  if (!db) { switchLocation(); if (!db) return; }
+function startGame(dupr) {
+  document.getElementById('pastSessions').style.display = 'none';
   const names = getPlayerNames();
   const duprs = getPlayerDuprs();
-  const numCourts = parseInt(document.getElementById('numCourts').value);
+  const courtLabels = getCourtNumbers();
+  const numCourts = courtLabels.length;
   const needed = numCourts * 4;
-  if (!numCourts || numCourts < 1) return alert('Enter a valid number of courts.');
+  if (!numCourts) return alert('Enter court numbers (e.g. 3, 5, 7).');
   if (names.length !== needed) return alert(`You need exactly ${needed} players for ${numCourts} courts. You entered ${names.length}.`);
   state.players = names.map((name, i) => ({ name, seed: i + 1, consecLosses: 0, dupr: duprs[i] || 0 }));
+  state.courtLabels = courtLabels;
+  state.duprMode = !!dupr;
+  state.startingDuprs = state.duprMode ? Object.fromEntries(names.map((name, i) => [name, duprs[i] || 0])) : null;
   state.round = 1;
   state.history = [];
   state.pendingResults = {};
   state.sessionStart = new Date().toISOString();
-  state.sessionDate = document.getElementById('dateSelect').value || document.getElementById('sessionDate').value || 'Custom Game';
-  state.sessionName = document.getElementById('locationInput').value.trim() || '';
+  state.sessionDate = document.getElementById('dateSelect').value || 'Custom Game';
   state.isQuickGame = false;
-  document.getElementById('setup').style.display = 'none';
-  document.getElementById('game').style.display = 'block';
-  saveState();
-  render();
-}
-
-function startRandomGame() {
-  if (!db) { switchLocation(); if (!db) return; }
-  const names = getPlayerNames();
-  const duprs = getPlayerDuprs();
-  const numCourts = parseInt(document.getElementById('numCourts').value);
-  const needed = numCourts * 4;
-  if (!numCourts || numCourts < 1) return alert('Enter a valid number of courts.');
-  if (names.length !== needed) return alert(`You need exactly ${needed} players for ${numCourts} courts. You entered ${names.length}.`);
-  state.players = names.map((name, i) => ({ name, seed: i + 1, consecLosses: 0, dupr: duprs[i] || 0 }));
-  state.round = 1;
-  state.history = [];
-  state.pendingResults = {};
-  state.sessionStart = new Date().toISOString();
-  state.sessionDate = 'Quick Game';
-  state.isQuickGame = true;
   document.getElementById('setup').style.display = 'none';
   document.getElementById('game').style.display = 'block';
   saveState();
@@ -377,21 +361,33 @@ function startRandomGame() {
 function resetGame() {
   if (!confirm('Reset the game for everyone?')) return;
   clearInterval(timerInterval); timerInterval = null;
-  archiveAndClear();
+  if (state.history && state.history.length && !state.isQuickGame) {
+    const key = (state.sessionDate || 'Custom') + '_' + (state.sessionStart || new Date().toISOString()).replace(/[.#$/\[\]]/g, '_');
+    firebase.database().ref('dev-' + sessionKey + '/archive/' + key.replace(/[.#$/\[\]]/g, '_')).set({
+      sessionDate: state.sessionDate || 'Custom Game',
+      sessionStart: state.sessionStart,
+      sessionEnd: new Date().toISOString(),
+      players: state.players,
+      history: state.history,
+      rounds: state.round - 1
+    });
+  }
+  state = { players: [], round: 1, history: [], pendingResults: {}, prevState: null };
+  db.remove();
+  document.getElementById('setup').style.display = 'block';
+  document.getElementById('game').style.display = 'none';
+  document.getElementById('history').innerHTML = '';
 }
 
 function endSession() {
   if (!confirm('End this session and save to history?')) return;
   clearInterval(timerInterval); timerInterval = null;
-  // Capture state before anything resets it
   const snap = JSON.parse(JSON.stringify(state));
-  const path = getArchivePath();
-  // Detach listener so db.remove doesn't trigger state reset
   if (db) db.off();
   let promise = Promise.resolve();
   if (snap.players && snap.players.length && !snap.isQuickGame) {
     const key = (snap.sessionDate || 'Custom') + '_' + (snap.sessionStart || new Date().toISOString()).replace(/[.#$/\[\]]/g, '_');
-    promise = firebase.database().ref(path + '/' + key.replace(/[.#$/\[\]]/g, '_')).set({
+    promise = firebase.database().ref('dev-' + sessionKey + '/archive/' + key.replace(/[.#$/\[\]]/g, '_')).set({
       sessionDate: snap.sessionDate || 'Custom Game',
       sessionStart: snap.sessionStart,
       sessionEnd: new Date().toISOString(),
@@ -402,36 +398,12 @@ function endSession() {
   }
   promise.then(() => {
     if (db) db.remove();
-    sessionStorage.removeItem('pkLocation');
+    state = { players: [], round: 1, history: [], pendingResults: {}, prevState: null };
+    document.getElementById('setup').style.display = 'block';
+    document.getElementById('game').style.display = 'none';
+    document.getElementById('history').innerHTML = '';
     location.reload();
   });
-}
-
-function archiveAndClear() {
-  let promise = null;
-  if (state.players && state.players.length && !state.isQuickGame) {
-    const key = (state.sessionDate || 'Custom') + '_' + (state.sessionStart || new Date().toISOString()).replace(/[.#$/\[\]]/g, '_');
-    const archRef = firebase.database().ref(getArchivePath() + '/' + key.replace(/[.#$/\[\]]/g, '_'));
-    promise = archRef.set({
-      sessionDate: state.sessionDate || 'Custom Game',
-      sessionStart: state.sessionStart,
-      sessionEnd: new Date().toISOString(),
-      players: state.players,
-      history: state.history || [],
-      rounds: state.round - 1
-    }).then(() => {
-      // Clear game after archive is confirmed saved
-      state = { players: [], round: 1, history: [], pendingResults: {}, prevState: null };
-      if (db) db.remove();
-    });
-  } else {
-    state = { players: [], round: 1, history: [], pendingResults: {}, prevState: null };
-    if (db) db.remove();
-  }
-  document.getElementById('setup').style.display = 'block';
-  document.getElementById('game').style.display = 'none';
-  document.getElementById('history').innerHTML = '';
-  return promise;
 }
 
 function getCourts() {
@@ -442,86 +414,73 @@ function getCourts() {
   return courts;
 }
 
-function fmtDupr(p) { return p.dupr ? ' <span class="dupr-badge">' + p.dupr.toFixed(1) + '</span>' : ''; }
+function fmtDupr(p) { return p.dupr ? ' <span class="dupr-badge">' + p.dupr.toFixed(3) + '</span>' : ''; }
 
-let timerInterval = null;
-let buzzerCtx = null;
-function ensureBuzzerCtx() {
-  if (!buzzerCtx) buzzerCtx = new (window.AudioContext || window.webkitAudioContext)();
-  if (buzzerCtx.state === 'suspended') buzzerCtx.resume();
-  return buzzerCtx;
+function updateSimDupr(players, base, winIdxs, loseIdxs, wScore, lScore) {
+  const K = 0.08;
+  const wAvg = winIdxs.reduce((s, i) => s + (players[base + i].dupr || 3.5), 0) / 2;
+  const lAvg = loseIdxs.reduce((s, i) => s + (players[base + i].dupr || 3.5), 0) / 2;
+  const expectedWin = 1 / (1 + Math.pow(10, (lAvg - wAvg) / 1.5));
+  let delta;
+  if (wScore !== null && lScore !== null) {
+    const total = wScore + lScore || 1;
+    const actualShare = wScore / total;
+    const expectedShare = 0.5 + (expectedWin - 0.5) * 0.6;
+    delta = K * (actualShare - expectedShare);
+  } else {
+    delta = K * (1 - expectedWin);
+  }
+  const changes = [];
+  winIdxs.forEach(i => {
+    const p = players[base + i];
+    if (!p.dupr) return;
+    const d = +Math.abs(delta).toFixed(3);
+    p.dupr = Math.min(8, +(p.dupr + d).toFixed(3));
+    changes.push({ name: p.name, change: '+' + d.toFixed(3) });
+  });
+  loseIdxs.forEach(i => {
+    const p = players[base + i];
+    if (!p.dupr) return;
+    const d = +Math.abs(delta).toFixed(3);
+    p.dupr = Math.max(2, +(p.dupr - d).toFixed(3));
+    changes.push({ name: p.name, change: '-' + d.toFixed(3) });
+  });
+  return changes;
 }
-document.addEventListener('touchstart', function() { ensureBuzzerCtx(); Object.values(buzzerWavs).forEach(function(a){a.load();}); }, { once: true });
-document.addEventListener('click', function() { ensureBuzzerCtx(); Object.values(buzzerWavs).forEach(function(a){a.load();}); }, { once: true });
 
-function makeWav(sr, durSec, genFn) {
-  var samples = sr * durSec | 0, buf = new Float32Array(samples);
-  for (var i = 0; i < samples; i++) buf[i] = genFn(i / sr);
-  var bps = 16, dataLen = samples * bps / 8;
-  var h = new ArrayBuffer(44), v = new DataView(h);
-  function ws(o,s){for(var i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i));}
-  ws(0,'RIFF');v.setUint32(4,36+dataLen,true);ws(8,'WAVE');ws(12,'fmt ');
-  v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);
-  v.setUint32(24,sr,true);v.setUint32(28,sr*bps/8,true);v.setUint16(32,bps/8,true);
-  v.setUint16(34,bps,true);ws(36,'data');v.setUint32(40,dataLen,true);
+var buzzerAudio = null;
+(function() {
+  var sr = 22050, dur = 1.0, samples = sr * dur | 0;
+  var buf = new Float32Array(samples);
+  var bursts = [[0, 0.15], [0.25, 0.4], [0.5, 1.0]];
+  for (var i = 0; i < samples; i++) {
+    var t = i / sr, val = 0;
+    for (var b = 0; b < bursts.length; b++) {
+      if (t >= bursts[b][0] && t < bursts[b][1]) {
+        var env = 1 - (t - bursts[b][0]) / (bursts[b][1] - bursts[b][0]);
+        val = (Math.sin(2 * Math.PI * 2800 * t) > 0 ? 1 : -1) * env * 0.8;
+      }
+    }
+    buf[i] = val;
+  }
+  var numCh = 1, bps = 16, byteRate = sr * numCh * bps / 8;
+  var dataLen = samples * numCh * bps / 8;
+  var header = new ArrayBuffer(44);
+  var v = new DataView(header);
+  function ws(o, s) { for (var i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); }
+  ws(0, 'RIFF'); v.setUint32(4, 36 + dataLen, true); ws(8, 'WAVE');
+  ws(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true);
+  v.setUint16(22, numCh, true); v.setUint32(24, sr, true);
+  v.setUint32(28, byteRate, true); v.setUint16(32, numCh * bps / 8, true);
+  v.setUint16(34, bps, true); ws(36, 'data'); v.setUint32(40, dataLen, true);
   var pcm = new Int16Array(samples);
-  for (var i = 0; i < samples; i++) pcm[i] = Math.max(-32768,Math.min(32767,buf[i]*32767));
-  return new Audio(URL.createObjectURL(new Blob([h,pcm.buffer],{type:'audio/wav'})));
-}
-function sq(t,f){return Math.sin(2*Math.PI*f*t)>0?1:-1;}
-function si(t,f){return Math.sin(2*Math.PI*f*t);}
-function saw(t,f){return 2*(t*f-Math.floor(t*f+0.5));}
-function env(t,s,e){return t>=s&&t<e?1-(t-s)/(e-s):0;}
-function envFlat(t,s,e){return t>=s&&t<e?1:0;}
-
-var buzzerWavs = {};
-(function(){
-  var sr = 22050;
-  // Gentle chimes (sine)
-  var noteChimes = {
-    ascending:[[523,0],[659,0.15],[784,0.3],[1047,0.45]],
-    descending:[[1047,0],[784,0.15],[659,0.3],[523,0.45]],
-    doorbell:[[659,0],[523,0.3]],
-    fanfare:[[392,0],[523,0.12],[659,0.24],[784,0.36],[1047,0.48]],
-    ping:[[1047,0]],
-    triple:[[523,0],[523,0.2],[784,0.4]]
-  };
-  Object.keys(noteChimes).forEach(function(k){
-    var notes=noteChimes[k];
-    buzzerWavs[k]=makeWav(sr,1.0,function(t){
-      var v=0;
-      notes.forEach(function(n){var s=n[1],d=k==='ping'?0.8:0.3;v+=si(t,n[0])*env(t,s,s+d)*0.7;});
-      return v;
-    });
-  });
-  // Whistle
-  buzzerWavs.whistle=makeWav(sr,1.0,function(t){
-    var v=0;
-    [[0,0.15],[0.25,0.4],[0.5,1.0]].forEach(function(p){v+=sq(t,2800)*env(t,p[0],p[1])*0.8;});
-    return v;
-  });
-  // Siren
-  buzzerWavs.siren=makeWav(sr,1.0,function(t){
-    var f=t<0.5?600+1200*t:1800-1200*t;
-    return saw(t,f)*0.8;
-  });
-  // Air horn
-  buzzerWavs.airhorn=makeWav(sr,1.2,function(t){
-    return (saw(t,220)+saw(t,277)+saw(t,330)+saw(t,440))*0.2;
-  });
-  // Alarm
-  buzzerWavs.alarm=makeWav(sr,1.0,function(t){
-    var v=0;
-    [[0,0.2,1500],[0.25,0.45,1800],[0.5,0.7,1500],[0.75,0.95,1800]].forEach(function(p){
-      v+=sq(t,p[2])*env(t,p[0],p[1])*0.8;
-    });
-    return v;
-  });
-  // Layered
-  buzzerWavs.layered=makeWav(sr,0.8,function(t){
-    return (sq(t,440)+sq(t,880)+sq(t,1760))*env(t,0,0.8)*0.3;
-  });
+  for (var i = 0; i < samples; i++) pcm[i] = Math.max(-32768, Math.min(32767, buf[i] * 32767));
+  var blob = new Blob([header, pcm.buffer], { type: 'audio/wav' });
+  buzzerAudio = new Audio(URL.createObjectURL(blob));
+  buzzerAudio.preload = 'auto';
 })();
+document.addEventListener('touchstart', function() { buzzerAudio.load(); }, { once: true });
+document.addEventListener('click', function() { buzzerAudio.load(); }, { once: true });
 
 let buzzerRepeatTimer = null;
 let buzzerStartTime = 0;
@@ -529,22 +488,19 @@ function playBuzzer(duration) {
   clearTimeout(buzzerRepeatTimer);
   var vol = (document.getElementById('buzzerVol') ? document.getElementById('buzzerVol').value : 50) / 100;
   var dur = (duration || 60) * 1000;
-  var sel = document.getElementById('chimeSelect');
-  var type = sel ? sel.value : 'whistle';
-  var audio = buzzerWavs[type] || buzzerWavs.whistle;
   buzzerStartTime = Date.now();
   function chimeLoop() {
     if (Date.now() - buzzerStartTime >= dur) { buzzerRepeatTimer = null; return; }
-    audio.volume = vol;
-    audio.currentTime = 0;
-    audio.play().catch(function(){});
+    buzzerAudio.volume = vol;
+    buzzerAudio.currentTime = 0;
+    buzzerAudio.play().catch(function(){});
     buzzerRepeatTimer = setTimeout(chimeLoop, 2000);
   }
   chimeLoop();
 }
 
+let timerInterval = null;
 let localTimerEnd = null;
-
 function startSessionTimer() {
   clearInterval(timerInterval);
   const mins = prompt('Set game timer (minutes):', '15');
@@ -560,10 +516,7 @@ function stopTimer() {
   document.getElementById('sessionTimer').textContent = '⏱ Set Timer';
   document.getElementById('sessionTimer').style.color = '#4ecca3';
   document.getElementById('stopTimerBtn').style.display = 'none';
-  var sel = document.getElementById('chimeSelect');
-  var type = sel ? sel.value : 'whistle';
-  var audio = buzzerWavs[type] || buzzerWavs.whistle;
-  if (audio) { audio.pause(); audio.currentTime = 0; }
+  if (buzzerAudio) { buzzerAudio.pause(); buzzerAudio.currentTime = 0; }
 }
 function runTimer() {
   clearInterval(timerInterval);
@@ -583,22 +536,23 @@ function runTimer() {
 function render() {
   document.getElementById('roundNum').textContent = state.round;
   if (state.sessionStart) {
-    let info = '';
-    if (state.sessionDate) info += state.sessionDate + ' · ';
-    info += 'Started: ' + new Date(state.sessionStart).toLocaleTimeString();
-    document.getElementById('sessionInfo').textContent = info;
     if (localTimerEnd && localTimerEnd > Date.now()) runTimer();
-    else if (!localTimerEnd) document.getElementById('sessionTimer').textContent = '⏱ Set Timer';
+    else if (!localTimerEnd && document.getElementById('sessionTimer')) document.getElementById('sessionTimer').textContent = '⏱ Set Timer';
   }
+  // Save unsaved score inputs before re-rendering
+  const savedScores = {};
+  document.querySelectorAll('[id^="scoreA_"],[id^="scoreB_"]').forEach(el => {
+    if (el.value) savedScores[el.id] = el.value;
+  });
   const courts = getCourts();
   const numCourts = courts.length;
   let html = '';
   courts.forEach((court, ci) => {
     const allResolved = state.pendingResults[ci] !== undefined;
-    html += `<div class="court"><h2>Court ${ci + 1}</h2>`;
+    html += `<div class="court"><h2>Court ${(state.courtLabels && state.courtLabels[ci]) || ci + 1}</h2>`;
     html += `<div class="players-list" style="margin-bottom:10px">`;
     court.forEach((p, si) => {
-      html += `<div class="player"><span class="seed-num">#${si+1}</span>${p.name}${p.dupr ? '<span class="dupr-badge">' + p.dupr.toFixed(1) + '</span>' : ''}<span class="consec">${p.consecLosses > 0 ? ' (L×' + p.consecLosses + ')' : ''}</span></div>`;
+      html += `<div class="player"><span class="seed-num">#${si+1}</span>${p.name}${p.dupr ? '<span class="dupr-badge">' + p.dupr.toFixed(3) + '</span>' : ''}<span class="consec">${p.consecLosses > 0 ? ' (L×' + p.consecLosses + ')' : ''}</span></div>`;
     });
     html += `</div>`;
     html += `<div class="matchups">`;
@@ -611,21 +565,79 @@ function render() {
     html += `<div style="color:#e94560;font-size:14px;font-weight:600;margin-bottom:4px">⬇ Bottom of the Court</div>`;
     html += `<div class="team"><span class="name">${tB[0].name}${fmtDupr(tB[0])} & ${tB[1].name}${fmtDupr(tB[1])}</span></div>`;
     if (!allResolved) {
-      html += `<button onclick="recordResult(${ci},'A')">🏆 Top Wins</button>`;
-      html += `<button onclick="recordResult(${ci},'B')" style="background:#0f3460;margin-top:4px">🏆 Bottom Wins</button>`;
+      if (state.duprMode) {
+        html += `<div style="display:flex;align-items:center;justify-content:center;gap:8px;margin:8px 0">`;
+        html += `<span style="color:#4ecca3;font-size:13px">Top</span>`;
+        html += `<input type="number" id="scoreA_${ci}" min="0" max="15" style="width:48px;padding:6px;border-radius:6px;border:none;background:#16213e;color:#4ecca3;font-size:16px;text-align:center" placeholder="0">`;
+        html += `<span style="color:#aaa;font-size:13px">–</span>`;
+        html += `<input type="number" id="scoreB_${ci}" min="0" max="15" style="width:48px;padding:6px;border-radius:6px;border:none;background:#16213e;color:#e94560;font-size:16px;text-align:center" placeholder="0">`;
+        html += `<span style="color:#e94560;font-size:13px">Bot</span>`;
+        html += `</div>`;
+        html += `<button onclick="recordScore(${ci})">✅ Submit Score</button>`;
+      } else {
+        html += `<button onclick="recordResult(${ci},'A')">🏆 Top Wins</button>`;
+        html += `<button onclick="recordResult(${ci},'B')" style="background:#0f3460;margin-top:4px">🏆 Bottom Wins</button>`;
+      }
     } else {
-      html += `<div style="text-align:center;color:#4ecca3;margin-top:8px;font-weight:600">✓ Winner: ${state.pendingResults[ci] === 'A' ? 'Top' : 'Bottom'}</div>`;
+      const r = state.pendingResults[ci];
+      const isObj = typeof r === 'object';
+      const winner = isObj ? r.winner : r;
+      if (isObj) {
+        html += `<div style="text-align:center;color:#4ecca3;margin-top:8px;font-weight:600">✓ ${winner === 'A' ? 'Top' : 'Bottom'} wins ${r.scoreA}–${r.scoreB}</div>`;
+      } else {
+        html += `<div style="text-align:center;color:#4ecca3;margin-top:8px;font-weight:600">✓ Winner: ${winner === 'A' ? 'Top' : 'Bottom'}</div>`;
+      }
       html += `<button onclick="clearResult(${ci})" style="background:#0f3460;margin-top:4px;font-size:12px">↩ Change</button>`;
     }
     html += `</div></div></div>`;
   });
   document.getElementById('courts').innerHTML = html;
 
+  // Restore unsaved score inputs
+  Object.entries(savedScores).forEach(([id, val]) => {
+    const el = document.getElementById(id);
+    if (el) el.value = val;
+  });
+
   if (Object.keys(state.pendingResults).length === numCourts) {
     document.getElementById('courts').innerHTML += `<div style="text-align:center;margin-top:10px"><button onclick="resolveRound()">Apply Results & Next Round →</button></div>`;
   }
 
+  if (state.duprMode) renderDuprSummary();
+  else document.getElementById('duprSummary').innerHTML = '';
   renderHistory();
+}
+
+function renderDuprSummary() {
+  const el = document.getElementById('duprSummary');
+  if (!el || !state.startingDuprs || !state.players.some(p => p.dupr > 0)) { if (el) el.innerHTML = ''; return; }
+  const seen = new Set();
+  const rows = state.players.filter(p => p.dupr > 0).map(p => ({ name: p.name, start: state.startingDuprs[p.name] || p.dupr, now: p.dupr })).filter(r => r.start > 0 && !seen.has(r.name) && seen.add(r.name));
+  if (!rows.length) { el.innerHTML = ''; return; }
+  rows.sort((a, b) => b.now - a.now);
+  let html = '<div style="background:#0f3460;border-radius:8px;padding:12px;margin-top:16px">';
+  html += '<h2 style="color:#e94560;margin:0 0 8px;font-size:16px">📊 DUPR Tracker</h2>';
+  rows.forEach(r => {
+    const diff = r.now - r.start;
+    const sign = diff >= 0 ? '+' : '';
+    const color = diff > 0 ? '#4ecca3' : diff < 0 ? '#e94560' : '#aaa';
+    html += `<div style="display:flex;justify-content:space-between;padding:4px 8px;font-size:13px">`;
+    html += `<span>${r.name}</span>`;
+    html += `<span><span style="color:#aaa">${r.start.toFixed(3)}</span> → <span style="color:#4ecca3;font-weight:600">${r.now.toFixed(3)}</span> <span style="color:${color};font-size:11px">(${sign}${diff.toFixed(3)})</span></span>`;
+    html += `</div>`;
+  });
+  html += '</div>';
+  el.innerHTML = html;
+}
+
+function recordScore(courtIdx) {
+  const a = parseInt(document.getElementById('scoreA_' + courtIdx).value);
+  const b = parseInt(document.getElementById('scoreB_' + courtIdx).value);
+  if (isNaN(a) || isNaN(b) || a < 0 || b < 0) return alert('Enter valid scores.');
+  if (a === b) return alert('Scores can\'t be tied.');
+  state.pendingResults[courtIdx] = { winner: a > b ? 'A' : 'B', scoreA: a, scoreB: b };
+  saveState();
+  render();
 }
 
 function recordResult(courtIdx, winner) {
@@ -666,11 +678,12 @@ function resolveRound() {
   // Save snapshot for undo
   state.prevState = JSON.stringify({ players: state.players, round: state.round, history: state.history, pendingResults: state.pendingResults });
   const numCourts = state.players.length / 4;
-  let roundLog = `<strong>Round ${state.round}:</strong> <span style="color:#aaa;font-size:11px">${new Date().toLocaleString()}</span><br>`;
+  let roundLog = `<strong>Round ${state.round}:</strong><br>`;
   const moves = [];
 
   for (let ci = 0; ci < numCourts; ci++) {
-    const w = state.pendingResults[ci];
+    const r = state.pendingResults[ci];
+    const w = (typeof r === 'object') ? r.winner : r;
     const base = ci * 4;
     const winners = w === 'A' ? [0, 3] : [1, 2];
     const losers = w === 'A' ? [1, 2] : [0, 3];
@@ -678,13 +691,31 @@ function resolveRound() {
     losers.forEach(i => { state.players[base + i].consecLosses += 1; });
     const wNames = winners.map(i => state.players[base + i].name).join(' & ');
     const lNames = losers.map(i => state.players[base + i].name).join(' & ');
-    roundLog += `Court ${ci + 1}: 🏆 ${wNames} beat ${lNames}<br>`;
+    const scoreStr = (typeof r === 'object' && r.scoreA !== undefined) ? ` (${r.scoreA}–${r.scoreB})` : '';
+    const cl = (state.courtLabels && state.courtLabels[ci]) || ci + 1;
+    roundLog += `Court ${cl}: 🏆 ${wNames} beat ${lNames}${scoreStr}<br>`;
+  }
+
+  // DUPR simulation
+  let duprLog = [];
+  if (state.duprMode && state.players.some(p => p.dupr > 0)) {
+    for (let ci = 0; ci < numCourts; ci++) {
+      const r = state.pendingResults[ci];
+      const w = (typeof r === 'object') ? r.winner : r;
+      const base = ci * 4;
+      const winIdxs = w === 'A' ? [0, 3] : [1, 2];
+      const loseIdxs = w === 'A' ? [1, 2] : [0, 3];
+      const wScore = (typeof r === 'object' && r.scoreA !== undefined) ? (w === 'A' ? r.scoreA : r.scoreB) : null;
+      const lScore = (typeof r === 'object' && r.scoreA !== undefined) ? (w === 'A' ? r.scoreB : r.scoreA) : null;
+      duprLog = duprLog.concat(updateSimDupr(state.players, base, winIdxs, loseIdxs, wScore, lScore));
+    }
   }
 
   const newCourts = [];
   for (let ci = 0; ci < numCourts; ci++) {
+    const r = state.pendingResults[ci];
+    const w = (typeof r === 'object') ? r.winner : r;
     const base = ci * 4;
-    const w = state.pendingResults[ci];
     const winIdxs = w === 'A' ? [0, 3] : [1, 2];
     const loseIdxs = w === 'A' ? [1, 2] : [0, 3];
     const winPlayers = winIdxs.map(i => state.players[base + i]);
@@ -716,8 +747,9 @@ function resolveRound() {
     }
   }
 
-  if (moves.length) roundLog += `<br><strong>Movements:</strong><br>` + moves.map(m => `&nbsp;&nbsp;${m}`).join('<br>');
+  if (moves.length) roundLog += `<br><em>Players rotated between courts.</em>`;
   else roundLog += `<br><em>No court changes this round.</em>`;
+  if (duprLog.length) roundLog += `<br><strong>📈 DUPR Sim:</strong><br>` + duprLog.map(d => `&nbsp;&nbsp;${d.name}: ${d.change}`).join('<br>');
 
   state.players = newCourts.flat();
   state.history.push(roundLog);
@@ -822,27 +854,15 @@ function fuzzyMatchPlayer(name, hits) {
     const fn = h.fullName.toLowerCase();
     const fnNorm = norm(h.fullName);
     let score = 0;
-
-    // Exact match
     if (fn === name.toLowerCase()) return h;
-
-    // All tokens present in full name
     const tokensFound = tokens.filter(t => fn.includes(t)).length;
     score += tokensFound * 3;
-
-    // Last name match (strongest signal)
     const hParts = fn.split(/\s+/);
     if (tokens.length > 1 && hParts.length > 1 && hParts[hParts.length - 1] === tokens[tokens.length - 1]) score += 5;
-
-    // First name starts with same chars (Bob/Robert won't match, but partial like "Mike"/"Michael" gets a point)
     if (tokens[0] && hParts[0] && (hParts[0].startsWith(tokens[0]) || tokens[0].startsWith(hParts[0]))) score += 2;
-
-    // Normalized containment
     if (fnNorm.includes(nameNorm) || nameNorm.includes(fnNorm)) score += 2;
-
     if (score > bestScore) { bestScore = score; best = h; }
   }
-  // Require at least last name match or 2+ token matches to avoid false positives
   return bestScore >= 3 ? best : hits[0];
 }
 
@@ -860,8 +880,7 @@ async function fetchDuprRatings() {
   status.style.color = '#aaa';
 
   try {
-    // Login
-    const loginRes = await fetch('https://api.dupr.gg/auth/v1.0/login/', {
+    const loginRes = await fetch(duprUrl('/auth/v1.0/login/'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password: pass })
@@ -875,31 +894,24 @@ async function fetchDuprRatings() {
 
     // Get logged-in user's own profile for self-match
     let selfName = null, selfRatings = null;
-    // Try login response user object
     const u = loginData.result.user;
     if (u) {
       selfName = u.fullName || u.name || ((u.firstName || '') + ' ' + (u.lastName || '')).trim();
       selfRatings = u.ratings;
-      // If no ratings in user object, try fetching player profile
       if (!selfRatings && u.id) {
         try {
-          const pRes = await fetch(`https://api.dupr.gg/player/v1.0/${u.id}`, {
-            headers: { 'Authorization': 'Bearer ' + token }
-          });
+          const pRes = await fetch(duprUrl(`/player/v1.0/${u.id}`), { headers: { 'Authorization': 'Bearer ' + token } });
           const pData = await pRes.json();
           if (pData.result) { selfRatings = pData.result.ratings; }
         } catch (e) {}
       }
     }
 
-    // Search each player
     const duprs = getPlayerDuprs();
     let found = 0;
-    // Collect all search results first
     const allResults = [];
     for (let i = 0; i < names.length; i++) {
       status.textContent = `🔄 Looking up ${names[i]}... (${i+1}/${names.length})`;
-      // Check if this player matches the logged-in user
       if (selfName && selfRatings) {
         const norm = s => s.toLowerCase().replace(/[^a-z]/g, '');
         if (norm(names[i]) === norm(selfName) || selfName.toLowerCase().includes(names[i].toLowerCase()) || names[i].toLowerCase().includes(selfName.toLowerCase())) {
@@ -909,7 +921,7 @@ async function fetchDuprRatings() {
       }
       try {
         const doSearch = async (q) => {
-          const r = await fetch('https://api.dupr.gg/player/v1.0/search', {
+          const r = await fetch(duprUrl('/player/v1.0/search'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
             body: JSON.stringify({ query: q, limit: 10, offset: 0, filter: { lat: 51.05, lng: -114.07, radiusInMeters: 1000000 }, includeUnclaimedPlayers: false })
@@ -926,19 +938,18 @@ async function fetchDuprRatings() {
         const autoRating = autoMatch?.ratings ? (parseFloat(autoMatch.ratings.doubles) || parseFloat(autoMatch.ratings.singles) || 0) : 0;
         if (autoRating > 0) { duprs[i] = autoRating; found++; }
         allResults.push({ idx: i, name: names[i], hits, autoMatch, autoRating });
-      } catch (e) { allResults.push({ idx: i, name: names[i], hits: [], autoMatch: null, autoRating: 0, error: e.message }); }
+      } catch (e) { allResults.push({ idx: i, name: names[i], hits: [], autoMatch: null, autoRating: 0 }); }
     }
 
-    // Auto-apply confident matches to player list immediately
-    renderPlayerList(names, duprs);
-
-    // Show interactive picker for review/correction
+    const combined0 = names.map((n, i) => ({ n, d: duprs[i] }));
+    combined0.sort((a, b) => b.d - a.d);
+    const sortedNames = combined0.map(p => p.n), sortedDuprs = combined0.map(p => p.d);
+    renderPlayerList(sortedNames, sortedDuprs);
     status.style.color = '#4ecca3';
     status.innerHTML = `✅ Auto-filled ${found}/${names.length} players. Review & correct below:`;
     const pickerDiv = document.createElement('div');
     pickerDiv.id = 'duprPicker';
     pickerDiv.style.cssText = 'margin-top:8px;max-height:400px;overflow-y:auto';
-
     const buildSelect = (idx, hits, autoMatch) => {
       let html = `<select data-idx="${idx}" style="background:#16213e;color:#eee;border:1px solid #333;border-radius:4px;padding:4px;font-size:12px;min-width:200px">`;
       html += `<option value="">Skip (${hits.length} results)</option>`;
@@ -952,14 +963,13 @@ async function fetchDuprRatings() {
       html += `</select>`;
       return html;
     };
-
     allResults.forEach(r => {
       const row = document.createElement('div');
       row.style.cssText = 'padding:6px 0;border-bottom:1px solid #1a1a2e;display:flex;align-items:center;gap:6px;flex-wrap:wrap';
       if (r.self) {
         row.innerHTML = `<span style="color:#4ecca3">✅ ${r.name} → self (${duprs[r.idx]})</span>`;
       } else {
-        let html = `<span style="color:#aaa;min-width:90px">${r.name} (${r.hits.length} hits${r.error ? ', ERR: '+r.error : ''}) →</span>`;
+        let html = `<span style="color:#aaa;min-width:90px">${r.name} (${r.hits.length} hits) →</span>`;
         html += buildSelect(r.idx, r.hits, r.autoMatch);
         html += `<input data-ridx="${r.idx}" placeholder="Re-search name" style="width:120px;padding:4px;border-radius:4px;border:1px solid #333;background:#16213e;color:#eee;font-size:12px">`;
         html += `<button data-ridx="${r.idx}" style="padding:4px 8px;font-size:11px;margin:0;background:#0f3460">🔍</button>`;
@@ -969,7 +979,7 @@ async function fetchDuprRatings() {
           const q = input.value.trim();
           if (!q) return;
           try {
-            const sr = await fetch('https://api.dupr.gg/player/v1.0/search', {
+            const sr = await fetch(duprUrl('/player/v1.0/search'), {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
               body: JSON.stringify({ query: q, limit: 10, offset: 0, filter: { lat: 51.05, lng: -114.07, radiusInMeters: 1000000 }, includeUnclaimedPlayers: false })
@@ -996,6 +1006,7 @@ async function fetchDuprRatings() {
       const combined = names.map((n, i) => ({ n, d: duprs[i] }));
       combined.sort((a, b) => b.d - a.d);
       renderPlayerList(combined.map(p => p.n), combined.map(p => p.d));
+      // Hide rows that have a rating, keep unmatched visible
       pickerDiv.querySelectorAll('[data-idx]').forEach(sel => {
         const idx = parseInt(sel.dataset.idx);
         if (duprs[idx] > 0) sel.closest('div').style.display = 'none';
@@ -1009,7 +1020,6 @@ async function fetchDuprRatings() {
     };
     pickerDiv.appendChild(applyBtn);
     status.parentNode.insertBefore(pickerDiv, status.nextSibling);
-    // Clear credentials from inputs
     document.getElementById('duprPass').value = '';
   } catch (e) {
     status.style.color = '#ff6b6b';
@@ -1018,13 +1028,10 @@ async function fetchDuprRatings() {
 }
 
 function showPastSessions() {
-  if (!db) { switchLocation(); }
-  if (!db) return alert('Select a date first.');
   const list = document.getElementById('pastList');
-  const path = getArchivePath();
   list.innerHTML = '<div style="color:#aaa">Loading...</div>';
   document.getElementById('pastSessions').style.display = 'block';
-  firebase.database().ref(getArchivePath()).once('value', snap => {
+  firebase.database().ref('dev-' + sessionKey + '/archive').once('value', snap => {
     const data = snap.val();
     if (!data) { list.innerHTML = '<div style="color:#aaa">No past sessions found.</div>'; return; }
     let html = '';
@@ -1057,23 +1064,55 @@ function reopenSession(names, duprs) {
 
 function deletePastSession(archKey) {
   if (!confirm('Delete this past session?')) return;
-  firebase.database().ref(getArchivePath() + '/' + archKey).remove().then(() => showPastSessions());
+  firebase.database().ref('dev-' + sessionKey + '/archive/' + archKey).remove().then(() => showPastSessions());
 }
 
 const dummyNames = ['Bob','Jim','Bill','Jack','Alice','Tom','Sue','Dan','Mike','Lisa','Chris','Emma','Dave','Sara','Pete','Nina','Greg','Jill','Mark','Amy'];
+function getCourtNumbers() {
+  return document.getElementById('courtNumbers').value.split(',').map(s => s.trim()).filter(s => s).map(Number).filter(n => n > 0);
+}
+
 function updateDummyNames() {
-  const n = parseInt(document.getElementById('numCourts').value) * 4;
+  const n = getCourtNumbers().length * 4;
   if (n > 0 && !document.getElementById('dateSelect').value) {
     renderPlayerList(dummyNames.slice(0, n));
   }
 }
 
-const SCHEDULE_URL = 'https://docs.google.com/document/d/12111pYeuP-AgHln3_F2Fkha8jMoTxqInJQK-HX_r9ss/export?format=txt';
+const DEFAULT_DOC_ID = '12111pYeuP-AgHln3_F2Fkha8jMoTxqInJQK-HX_r9ss';
 let scheduleData = {};
+
+function getDocExportUrl() {
+  const stored = localStorage.getItem('pb_doc_id');
+  const id = stored || DEFAULT_DOC_ID;
+  return 'https://docs.google.com/document/d/' + id + '/export?format=txt';
+}
+
+function extractDocId(input) {
+  const m = input.match(/\/d\/([a-zA-Z0-9_-]+)/);
+  if (m) return m[1];
+  if (/^[a-zA-Z0-9_-]{20,}$/.test(input.trim())) return input.trim();
+  return null;
+}
+
+function saveDocUrl() {
+  const input = document.getElementById('docUrlInput').value.trim();
+  if (!input) { localStorage.removeItem('pb_doc_id'); fetchSchedule(); return; }
+  const id = extractDocId(input);
+  if (!id) { alert('Could not parse a Google Doc ID from that input.'); return; }
+  localStorage.setItem('pb_doc_id', id);
+  document.getElementById('docUrlInput').value = 'https://docs.google.com/document/d/' + id + '/edit';
+  fetchSchedule();
+}
+
+function initDocInput() {
+  const id = localStorage.getItem('pb_doc_id') || DEFAULT_DOC_ID;
+  document.getElementById('docUrlInput').value = 'https://docs.google.com/document/d/' + id + '/edit';
+}
 
 function fetchSchedule() {
   document.getElementById('dateSelect').innerHTML = '<option value="">Loading...</option>';
-  fetch(SCHEDULE_URL)
+  fetch(getDocExportUrl())
     .then(r => r.text())
     .then(text => {
       scheduleData = {};
@@ -1103,19 +1142,28 @@ function fetchSchedule() {
       headers.forEach((h, i) => {
         const nextStart = i + 1 < headers.length ? headers[i + 1].idx - headers[i + 1].key.length : undefined;
         const body = text.substring(h.idx, nextStart);
-        // Check if numbering restarts at "1." — means two dates share this body
-        // Split at the second occurrence of "1." (preceded by a higher number)
-        const restartMatch = body.match(/(\d+\.\s*[^0-9?].*?)\s+(?=1\.\s*[^0-9?])/);
-        if (restartMatch) {
-          const splitIdx = body.indexOf(restartMatch[0]) + restartMatch[0].length;
-          const firstHalf = body.substring(0, splitIdx);
-          const secondHalf = body.substring(splitIdx);
-          // First half belongs to the previous date header (which had empty body)
-          if (i > 0 && !scheduleData[headers[i - 1].key]) {
-            const p = extractPlayers(firstHalf);
-            if (p.length) scheduleData[headers[i - 1].key] = p;
+        // Split body at every numbering restart (where "1." appears after a higher number)
+        const chunks = [];
+        const numRe = /(\d+)\.\s*/g;
+        let nm, lastNum = 0, splitPoints = [];
+        while ((nm = numRe.exec(body)) !== null) {
+          const n = parseInt(nm[1]);
+          if (n === 1 && lastNum > 1) splitPoints.push(nm.index);
+          lastNum = n;
+        }
+
+        if (splitPoints.length > 0) {
+          let prev = 0;
+          splitPoints.forEach(sp => { chunks.push(body.substring(prev, sp)); prev = sp; });
+          chunks.push(body.substring(prev));
+          // Assign chunks to empty preceding date headers, last chunk = this date
+          const emptyBefore = [];
+          for (let j = i - 1; j >= 0 && !scheduleData[headers[j].key]; j--) emptyBefore.unshift(j);
+          for (let c = 0; c < chunks.length - 1 && c < emptyBefore.length; c++) {
+            const p = extractPlayers(chunks[c]);
+            if (p.length) scheduleData[headers[emptyBefore[c]].key] = p;
           }
-          const p = extractPlayers(secondHalf);
+          const p = extractPlayers(chunks[chunks.length - 1]);
           if (p.length) scheduleData[h.key] = p;
         } else {
           const p = extractPlayers(body);
@@ -1143,233 +1191,7 @@ function onDateSelect() {
   const players = scheduleData[key];
   renderPlayerList(players);
   const courts = Math.floor(players.length / 4);
-  document.getElementById('numCourts').value = courts;
-}
-
-// --- Round Robin Mode ---
-let rrState = null;
-let rrDb;
-
-function initRRDb() {
-  if (!rrDb) rrDb = firebase.database().ref(getRrPath());
-}
-
-function startRoundRobin() {
-  const names = getPlayerNames().filter(Boolean);
-  if (names.length < 4) return alert('Need at least 4 players for round robin.');
-  const duprs = getPlayerDuprs();
-  const numCourts = parseInt(document.getElementById('numCourts').value);
-  const hasDupr = duprs.some(d => d > 0);
-
-  let teams;
-  if (hasDupr) {
-    // Balanced pairing: sort by DUPR, pair strongest with weakest
-    const sorted = names.map((_, i) => i).sort((a, b) => (duprs[b] || 0) - (duprs[a] || 0));
-    teams = [];
-    const half = Math.floor(sorted.length / 2);
-    for (let i = 0; i < half; i++)
-      teams.push([sorted[i], sorted[sorted.length - 1 - i]]);
-    // If odd number, pair remaining with strongest unmatched
-    if (sorted.length % 2) teams.push([sorted[half], sorted[0]]);
-  } else {
-    // All possible team pairings
-    teams = [];
-    for (let i = 0; i < names.length; i++)
-      for (let j = i + 1; j < names.length; j++)
-        teams.push([i, j]);
-  }
-
-  // Generate matchups: every team vs every other team (no player plays against themselves)
-  const matchups = [];
-  for (let a = 0; a < teams.length; a++)
-    for (let b = a + 1; b < teams.length; b++) {
-      const ta = teams[a], tb = teams[b];
-      if (ta[0] !== tb[0] && ta[0] !== tb[1] && ta[1] !== tb[0] && ta[1] !== tb[1])
-        matchups.push({ teamA: ta, teamB: tb });
-    }
-
-  // Schedule rounds: each round fills up to numCourts games, no player plays twice per round
-  const rounds = [];
-  const used = new Set();
-  let pool = matchups.map((m, i) => i);
-  while (pool.length) {
-    const round = [];
-    const busyPlayers = new Set();
-    const remaining = [];
-    for (const idx of pool) {
-      const m = matchups[idx];
-      const ps = [...m.teamA, ...m.teamB];
-      if (round.length < numCourts && ps.every(p => !busyPlayers.has(p))) {
-        round.push(idx);
-        ps.forEach(p => busyPlayers.add(p));
-      } else {
-        remaining.push(idx);
-      }
-    }
-    if (!round.length) break; // can't schedule more
-    rounds.push(round);
-    pool = remaining;
-  }
-
-  rrState = {
-    players: names,
-    duprs: duprs,
-    matchups,
-    rounds,
-    currentRound: 0,
-    results: {},
-    log: []
-  };
-
-  initRRDb();
-  document.getElementById('setup').style.display = 'none';
-  document.getElementById('rrGame').style.display = 'block';
-  saveRR();
-  renderRR();
-}
-
-function saveRR() {
-  initRRDb();
-  rrDb.set(rrState);
-}
-
-function renderRR() {
-  if (!rrState) return;
-  const { players, matchups, rounds, currentRound, results } = rrState;
-
-  if (currentRound >= rounds.length) {
-    document.getElementById('rrRoundNum').textContent = 'Complete!';
-    document.getElementById('rrTotalRounds').textContent = rounds.length;
-    document.getElementById('rrCourts').innerHTML = '<div style="text-align:center;color:#4ecca3;font-size:18px;padding:20px">🏆 All rounds complete!</div>';
-    renderRRStandings();
-    renderRRLog();
-    return;
-  }
-
-  document.getElementById('rrRoundNum').textContent = currentRound + 1;
-  document.getElementById('rrTotalRounds').textContent = rounds.length;
-
-  const roundMatchups = rounds[currentRound];
-  let html = '';
-  let allDone = true;
-
-  roundMatchups.forEach((mi, ci) => {
-    const m = matchups[mi];
-    const tA = m.teamA.map(i => players[i]).join(' & ');
-    const tB = m.teamB.map(i => players[i]).join(' & ');
-    const res = results[mi];
-    html += `<div class="court"><h2>Court ${ci + 1}</h2>`;
-    html += `<div class="match">`;
-    html += `<div class="team"><span class="name">${tA}</span></div>`;
-    html += `<div class="vs">VS</div>`;
-    html += `<div class="team"><span class="name">${tB}</span></div>`;
-    if (res) {
-      html += `<div style="text-align:center;color:#4ecca3;margin-top:8px;font-weight:600">🏆 ${res === 'A' ? tA : tB}</div>`;
-      html += `<button onclick="clearRRResult(${mi})" style="background:#0f3460;margin-top:4px;font-size:12px">↩ Change</button>`;
-    } else {
-      allDone = false;
-      html += `<button onclick="recordRRResult(${mi},'A')">🏆 ${tA} Win</button>`;
-      html += `<button onclick="recordRRResult(${mi},'B')" style="background:#0f3460;margin-top:4px">🏆 ${tB} Win</button>`;
-    }
-    html += `</div></div>`;
-  });
-
-  if (allDone && roundMatchups.every(mi => results[mi])) {
-    html += `<div style="text-align:center;margin-top:10px"><button onclick="advanceRRRound()">Next Round →</button></div>`;
-  }
-
-  document.getElementById('rrCourts').innerHTML = html;
-  renderRRStandings();
-  renderRRLog();
-}
-
-function recordRRResult(mi, winner) {
-  rrState.results[mi] = winner;
-  saveRR();
-  renderRR();
-}
-
-function clearRRResult(mi) {
-  delete rrState.results[mi];
-  saveRR();
-  renderRR();
-}
-
-function advanceRRRound() {
-  const { players, matchups, rounds, currentRound, results } = rrState;
-  let logEntry = `<strong>Round ${currentRound + 1}:</strong><br>`;
-  rounds[currentRound].forEach(mi => {
-    const m = matchups[mi];
-    const tA = m.teamA.map(i => players[i]).join(' & ');
-    const tB = m.teamB.map(i => players[i]).join(' & ');
-    const winner = results[mi] === 'A' ? tA : tB;
-    logEntry += `🏆 ${winner} beat ${results[mi] === 'A' ? tB : tA}<br>`;
-  });
-  rrState.log.push(logEntry);
-  rrState.currentRound++;
-  saveRR();
-  renderRR();
-}
-
-function renderRRStandings() {
-  const { players, duprs, matchups, results } = rrState;
-  const stats = players.map((name, i) => ({ name, idx: i, dupr: (duprs && duprs[i]) || 0, wins: 0, losses: 0, played: 0 }));
-  Object.entries(results).forEach(([mi, winner]) => {
-    const m = matchups[parseInt(mi)];
-    const winTeam = winner === 'A' ? m.teamA : m.teamB;
-    const loseTeam = winner === 'A' ? m.teamB : m.teamA;
-    winTeam.forEach(i => { stats[i].wins++; stats[i].played++; });
-    loseTeam.forEach(i => { stats[i].losses++; stats[i].played++; });
-  });
-  stats.sort((a, b) => b.wins - a.wins || a.losses - b.losses);
-  let html = '<h2 style="color:#e94560;margin-bottom:10px">📊 Standings</h2>';
-  html += '<div style="background:#16213e;border-radius:8px;padding:12px">';
-  stats.forEach((s, i) => {
-    const pct = s.played ? Math.round(100 * s.wins / s.played) : 0;
-    const duprTag = s.dupr ? ` <span class="dupr-badge">${s.dupr.toFixed(1)}</span>` : '';
-    html += `<div style="display:flex;justify-content:space-between;padding:6px 8px;${i === 0 && s.wins > 0 ? 'color:#4ecca3;font-weight:700' : ''}">`;
-    html += `<span>${i + 1}. ${s.name}${duprTag}</span>`;
-    html += `<span>${s.wins}W - ${s.losses}L (${pct}%)</span></div>`;
-  });
-  html += '</div>';
-  document.getElementById('rrStandings').innerHTML = html;
-}
-
-function renderRRLog() {
-  if (!rrState.log.length) { document.getElementById('rrLog').innerHTML = ''; return; }
-  let html = '<h2 style="color:#e94560;margin-bottom:10px">History</h2>';
-  rrState.log.slice().reverse().forEach(h => {
-    html += `<div class="history-entry">${h}</div>`;
-  });
-  document.getElementById('rrLog').innerHTML = html;
-}
-
-function resetRR() {
-  if (!confirm('Reset round robin for everyone?')) return;
-  rrState = null;
-  initRRDb();
-  rrDb.remove();
-  document.getElementById('rrGame').style.display = 'none';
-  document.getElementById('setup').style.display = 'block';
-  document.getElementById('rrStandings').innerHTML = '';
-  document.getElementById('rrLog').innerHTML = '';
-}
-
-// Listen for RR state from Firebase
-function listenRR() {
-  initRRDb();
-  rrDb.on('value', snap => {
-    const data = snap.val();
-    if (data && data.players) {
-      rrState = data;
-      rrState.results = rrState.results || {};
-      rrState.log = rrState.log || [];
-      document.getElementById('setup').style.display = 'none';
-      document.getElementById('game').style.display = 'none';
-      document.getElementById('rrGame').style.display = 'block';
-      renderRR();
-    }
-  });
+  document.getElementById('courtNumbers').value = Array.from({length: courts}, (_, i) => i + 1).join(', ');
 }
 </script>
 </body>
