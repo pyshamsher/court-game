@@ -1169,13 +1169,25 @@ function fetchSchedule() {
           if (p.length) scheduleData[h.key] = p;
         } else {
           const p = extractPlayers(body);
-          if (p.length) scheduleData[h.key] = p;
+          if (p.length) {
+            // If body contains a cancelled note, assign players to the nearest empty preceding header
+            // and mark this date as cancelled so it doesn't consume a backward-assignment slot
+            const cancelled = /cancel/i.test(body);
+            if (cancelled) {
+              scheduleData[h.key] = [];
+              for (let j = i - 1; j >= 0; j--) {
+                if (!scheduleData[headers[j].key]) { scheduleData[headers[j].key] = p; break; }
+              }
+            } else {
+              scheduleData[h.key] = p;
+            }
+          }
         }
       });
 
       const sel = document.getElementById('dateSelect');
       sel.innerHTML = '<option value="">-- Select a date --</option>';
-      Object.keys(scheduleData).forEach(d => {
+      Object.keys(scheduleData).filter(d => scheduleData[d].length > 0).forEach(d => {
         const opt = document.createElement('option');
         opt.value = d;
         opt.textContent = d + ' (' + scheduleData[d].length + ' players)';
