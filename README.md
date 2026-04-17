@@ -16,7 +16,7 @@ Surge account: mr.shamshersingh@gmail.com
 - Project: pickleball-tracker-2ce69
 - Console: https://console.firebase.google.com/project/pickleball-tracker-2ce69/overview
 - Database: https://pickleball-tracker-2ce69-default-rtdb.firebaseio.com/
-- Database is in **test mode** (open read/write — consider adding rules later)
+- Database rules: open read/write (`".read": true, ".write": true`) — no expiration
 - Firebase config is embedded in index.html
 
 ## Google Doc Integration
@@ -99,7 +99,7 @@ Surge account: mr.shamshersingh@gmail.com
 ```
 
 ## Notes
-- Firebase test mode rules expire after 30 days — update security rules before then
+- Firebase rules are set to open read/write with no expiration (`".read": true, ".write": true`)
 - Quick Games (🎲) are not archived on reset
 - Each browser session needs to enter the passcode once
 
