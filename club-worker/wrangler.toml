@@ -1,0 +1,14 @@
+name = "club-members"
+main = "index.js"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+
+[browser]
+binding = "BROWSER"
+
+[vars]
+CLUB_URL = "https://www.pickleballstalbert.ca"
+
+# Secrets (set via `wrangler secret put`):
+# CLUB_EMAIL - your pickleballstalbert.ca login email
+# CLUB_PASSWORD - your pickleballstalbert.ca login password

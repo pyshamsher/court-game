@@ -29,7 +29,6 @@
   .players-list .player { background: #0f3460; padding: 6px 12px; border-radius: 6px; font-size: 13px; }
   .player .seed-num { color: #e94560; font-weight: 700; margin-right: 4px; }
   .player .consec { color: #ff6b6b; font-size: 11px; margin-left: 4px; }
-  .round-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
   .round-header h2 { color: #e94560; }
   #history { max-width: 800px; margin: 20px auto 0; }
   #history h2 { color: #e94560; margin-bottom: 10px; }
@@ -52,11 +51,27 @@
   .player.swap-mode { cursor: pointer; }
   .player.swap-mode:hover { background: rgba(78,204,163,0.15); }
   .swap-bar { text-align: center; margin: 8px 0; padding: 8px; background: #16213e; border-radius: 8px; font-size: 13px; color: #f7d716; }
-</style>
+  .round-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 8px; }</style>
 </head>
 <body>
 
 <h1>🏓 Pickleball Court Tracker</h1>
+
+<div id="signupView" style="display:none;max-width:500px;margin:0 auto;text-align:center">
+  <div style="background:#16213e;padding:24px;border-radius:12px">
+    <h2 style="color:#4ecca3;margin-bottom:4px">🏓 Pickleball Signup</h2>
+    <div id="signupDate" style="font-size:20px;font-weight:700;color:#e94560;margin-bottom:16px"></div>
+    <div style="position:relative;margin-bottom:16px">
+      <div style="display:flex;gap:8px">
+        <input type="text" id="signupName" placeholder="Enter your name..." oninput="onSignupInput()" onkeydown="if(event.key==='Enter')addSignup()" style="flex:1;padding:10px;border-radius:8px;border:none;background:#0f3460;color:#eee;font-size:16px">
+        <button onclick="addSignup()" style="margin:0;padding:10px 20px">Join</button>
+      </div>
+      <div id="signupSuggestions" style="display:none;position:absolute;top:46px;left:0;right:60px;background:#0f3460;border-radius:8px;border:1px solid #333;max-height:200px;overflow-y:auto;z-index:10;text-align:left"></div>
+    </div>
+    <div id="signupStatus" style="font-size:12px;color:#aaa;margin-bottom:12px"></div>
+    <div id="signupList" style="text-align:left"></div>
+  </div>
+</div>
 
 <div id="lock">
   <div class="lock-box">
@@ -65,6 +80,30 @@
     <input type="password" id="passcodeInput" placeholder="Passcode" onkeydown="if(event.key==='Enter')checkPasscode()" style="margin-bottom:8px">
     <br><button onclick="checkPasscode()">Enter</button>
     <div class="error" id="lockError"></div>
+    <div id="activeSignups" style="margin-top:16px;border-top:1px solid #333;padding-top:12px;text-align:left">
+      <label style="font-weight:600;font-size:14px">📋 Open Signups</label>
+      <div id="activeSignupList" style="margin-top:8px;font-size:13px;color:#aaa">Loading...</div>
+    </div>
+    <div id="organizerPanel" style="display:none;margin-top:16px;border-top:1px solid #333;padding-top:16px;text-align:left">
+      <label style="font-weight:600;font-size:14px">📋 Organizer Panel</label>
+      <div style="margin-top:8px">
+        <label style="font-size:13px;color:#aaa">Create signup link:</label>
+        <div style="display:flex;gap:6px;margin-top:4px">
+          <input type="text" id="orgSignupDate" placeholder="e.g. WED-APR-30" style="flex:1;text-align:left">
+          <button onclick="createSignupLink()" style="margin:0;padding:8px 12px;font-size:12px;background:#4ecca3;color:#1a1a2e;font-weight:700">Create</button>
+        </div>
+        <div id="orgSignupMsg" style="font-size:12px;margin-top:4px;color:#4ecca3;word-break:break-all"></div>
+        <div id="orgActiveList" style="margin-top:8px;font-size:13px"></div>
+      </div>
+      <div style="margin-top:12px;border-top:1px solid #333;padding-top:10px">
+        <label style="font-size:13px;color:#aaa">Create game session:</label>
+        <div style="display:flex;gap:6px;margin-top:4px">
+          <input type="text" id="orgSessionCode" placeholder="New session passcode" onkeydown="if(event.key==='Enter')createOrgSession()" style="flex:1;text-align:left">
+          <button onclick="createOrgSession()" style="margin:0;padding:8px 14px;background:#4ecca3;color:#1a1a2e;font-weight:700">Create</button>
+        </div>
+      </div>
+      <div id="orgExistingSessions" style="margin-top:8px;font-size:13px"></div>
+    </div>
     <div id="adminPanel" style="display:none;margin-top:16px;border-top:1px solid #333;padding-top:16px;text-align:left">
       <label style="font-weight:600;font-size:14px">🔧 Create New Session</label><br>
       <div style="display:flex;gap:6px;margin-top:8px">
@@ -73,12 +112,28 @@
       </div>
       <div id="existingSessions" style="margin-top:12px;font-size:13px;color:#aaa"></div>
       <div style="margin-top:14px;border-top:1px solid #333;padding-top:10px">
+        <label style="font-size:13px;color:#aaa">Create signup link:</label>
+        <div style="display:flex;gap:6px;margin-top:4px">
+          <input type="text" id="newSignupDate" placeholder="e.g. WED-APR-30" style="flex:1;text-align:left">
+          <button onclick="createSignupLink()" style="margin:0;padding:8px 12px;font-size:12px;background:#4ecca3;color:#1a1a2e;font-weight:700">Create</button>
+        </div>
+        <div id="signupLinkMsg" style="font-size:12px;margin-top:4px;color:#4ecca3;word-break:break-all"></div>
+      </div>
+      <div style="margin-top:14px;border-top:1px solid #333;padding-top:10px">
         <label style="font-size:13px;color:#aaa">Change admin passcode:</label>
         <div style="display:flex;gap:6px;margin-top:4px">
           <input type="text" id="newAdminCode" placeholder="New admin passcode" style="flex:1;text-align:left">
           <button onclick="changeAdminCode()" style="margin:0;padding:8px 12px;font-size:12px">Save</button>
         </div>
         <div id="adminCodeMsg" style="font-size:12px;margin-top:4px;color:#4ecca3"></div>
+      </div>
+      <div style="margin-top:10px">
+        <label style="font-size:13px;color:#aaa">Change organizer passcode:</label>
+        <div style="display:flex;gap:6px;margin-top:4px">
+          <input type="text" id="newOrgCode" placeholder="New organizer passcode" style="flex:1;text-align:left">
+          <button onclick="changeOrgCode()" style="margin:0;padding:8px 12px;font-size:12px">Save</button>
+        </div>
+        <div id="orgCodeMsg" style="font-size:12px;margin-top:4px;color:#4ecca3"></div>
       </div>
     </div>
   </div>
@@ -89,6 +144,7 @@
 
 <div id="setup">
   <div class="setup-form">
+    <div id="scheduleSection" style="display:none">
     <label>Load players from schedule:</label>
     <div style="display:flex;gap:6px;margin-bottom:8px;align-items:center">
       <input type="text" id="docUrlInput" placeholder="Paste Google Doc URL or ID" style="flex:1;padding:8px;border-radius:8px;border:none;background:#0f3460;color:#eee;font-size:13px">
@@ -98,6 +154,8 @@
       <option value="">-- Select a date --</option>
     </select>
     <button onclick="fetchSchedule()" style="background:#0f3460;margin-bottom:12px">🔄 Refresh Schedule</button>
+    </div>
+    <button onclick="loadFromSignups()" style="background:#0f3460;margin-bottom:12px">📋 Load from Signups</button>
     <label>Court Numbers (comma-separated, e.g. 3, 5, 7):</label>
     <input type="text" id="courtNumbers" value="1, 2" oninput="updateDummyNames()" style="width:200px;padding:8px;border-radius:8px;border:none;background:#0f3460;color:#eee;font-size:14px;margin-bottom:12px">
     <label>Players (drag to reorder, edit if needed):</label>
@@ -107,14 +165,7 @@
     <button onclick="sortByDupr()" style="background:#0f3460;margin-bottom:8px">📊 Sort by DUPR</button>
     <button onclick="showDuprLogin()" style="background:#0f3460;margin-bottom:8px">🔍 Fetch DUPR Ratings</button>
     <div id="duprModal" style="display:none;background:#0f3460;padding:16px;border-radius:8px;margin-bottom:12px">
-      <label style="font-size:13px">Enter your DUPR login to fetch ratings for all players:</label>
-      <div style="display:flex;gap:8px;margin-top:8px">
-        <input id="duprEmail" placeholder="DUPR Email" style="flex:1;padding:8px;border-radius:6px;border:none;background:#16213e;color:#eee;font-size:13px">
-        <input id="duprPass" type="password" placeholder="Password" style="flex:1;padding:8px;border-radius:6px;border:none;background:#16213e;color:#eee;font-size:13px">
-        <button onclick="fetchDuprRatings()" style="margin:0;padding:8px 16px">Fetch</button>
-        <button onclick="document.getElementById('duprModal').style.display='none'" style="margin:0;background:#16213e;padding:8px">✕</button>
-      </div>
-      <div id="duprStatus" style="font-size:12px;margin-top:6px;color:#aaa;white-space:pre-wrap"></div>
+      <div id="duprStatus" style="font-size:13px;color:#aaa;white-space:pre-wrap"></div>
     </div>
     <div style="display:flex;gap:8px;margin:10px 0">
       <button onclick="startGame()" style="flex:1">▶ Start Classic</button>
@@ -122,6 +173,7 @@
     </div>
     <button onclick="showPastSessions()" style="background:#0f3460">📜 Past Sessions</button>
     <button onclick="switchSession()" style="background:#0f3460">🔑 Switch Session</button>
+    <button onclick="logout()" style="background:#0f3460">🚪 Logout</button>
   </div>
 </div>
 
@@ -135,14 +187,17 @@
   <div class="round-header">
     <h2>Round <span id="roundNum">1</span></h2>
     <div>
-      <span id="sessionInfo" style="font-size:12px;color:#aaa;margin-right:12px"></span>
       <span id="sessionTimer" onclick="startSessionTimer()" style="font-size:16px;color:#4ecca3;margin-right:6px;font-weight:600;cursor:pointer;background:#0f3460;padding:8px 16px;border-radius:8px" title="Click to set timer">⏱ Set Timer</span>
       <span id="stopTimerBtn" onclick="stopTimer()" style="display:none;font-size:20px;color:#fff;font-weight:700;cursor:pointer;background:#e94560;padding:10px 22px;border-radius:8px;margin-right:6px">⏹ STOP</span>
       <button onclick="undoRound()" style="background:#0f3460">↩ Undo</button>
-      <button onclick="resetGame()">Reset</button>
-      <button onclick="endSession()" style="background:#e94560">🏁 End Session</button>
-      <button onclick="switchSession()" style="background:#0f3460;font-size:11px">🔑 Switch Session</button>
+      <button onclick="endSession()" style="background:#e94560">🏁 End</button>
+      <button onclick="toggleMoreActions()" style="background:#0f3460;font-size:12px">⋯</button>
     </div>
+  </div>
+  <div id="moreActions" style="display:none;text-align:center;margin-bottom:12px">
+    <button onclick="resetGame()" style="font-size:12px">Reset</button>
+    <button onclick="switchSession()" style="background:#0f3460;font-size:12px">🔑 Switch Session</button>
+    <button onclick="toggleSwapMode()" style="background:#0f3460;font-size:12px">🔀 Swap Players</button>
   </div>
   <div id="courts"></div>
   <div id="duprSummary"></div>
@@ -151,6 +206,7 @@
 <div id="history"></div>
 </div><!-- end #app -->
 
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
 <script>
@@ -158,16 +214,404 @@
 // Direct calls to api.dupr.gg are blocked by CORS from browser.
 // Route through a Cloudflare Worker proxy instead.
 const DUPR_PROXY = 'https://dupr-proxy.mr-shamshersingh.workers.dev';
+const CLUB_API = 'https://club-members.mr-shamshersingh.workers.dev';
 function duprUrl(path) { return DUPR_PROXY + path; }
+
+// --- Signup Mode ---
+(function() {
+  const params = new URLSearchParams(window.location.search);
+  const signupDate = params.get('signup');
+  if (!signupDate) return;
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('lock').style.display = 'none';
+    document.getElementById('signupView').style.display = 'block';
+    document.getElementById('signupDate').textContent = '📅 ' + signupDate.replace(/-/g, ' ');
+    // Check if this signup date was created by admin
+    getDb().ref('signups/' + signupDate + '/active').once('value').then(snap => {
+      if (snap.val()) {
+        loadSignups(signupDate);
+      } else {
+        document.getElementById('signupStatus').textContent = '⚠️ This signup is not active. Ask your organizer for a valid link.';
+        document.getElementById('signupStatus').style.color = '#ff6b6b';
+        document.getElementById('signupName').disabled = true;
+        document.querySelector('#signupView button').disabled = true;
+      }
+    });
+  });
+})();
+
+function signupRef(date) { return getDb().ref('signups/' + date + '/players'); }
+
+function loadSignups(date) {
+  signupRef(date).on('value', snap => {
+    const players = snap.val() || {};
+    const list = document.getElementById('signupList');
+    const entries = Object.entries(players).sort((a, b) => a[1].ts - b[1].ts);
+    if (!entries.length) { list.innerHTML = '<div style="color:#aaa;padding:8px">No signups yet. Be the first!</div>'; return; }
+    const count = entries.length;
+    document.getElementById('signupStatus').textContent = count + ' player' + (count > 1 ? 's' : '') + ' signed up';
+    // Only show full list if unlocked with session passcode
+    if (!window.signupUnlocked) {
+      list.innerHTML = `<div style="padding:8px;color:#aaa;text-align:center">${count} players signed up.<br><button onclick="unlockSignupList()" style="margin-top:8px;font-size:12px;background:#0f3460">🔒 View player list</button></div>`;
+    } else {
+      list.innerHTML = entries.map(([key, p], i) =>
+        `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px;margin:4px 0;background:#0f3460;border-radius:6px">` +
+        `<span><span style="color:#e94560;font-weight:700">${i+1}.</span> ${p.name}${p.dupr ? ' <span style="color:#4ecca3;font-size:12px">' + p.dupr.toFixed(2) + '</span>' : ''}</span>` +
+        `<button onclick="removeSignup('${date}','${key}')" style="margin:0;padding:2px 8px;font-size:11px;background:#e94560">✕</button></div>`
+      ).join('');
+    }
+  });
+}
+
+function unlockSignupList() {
+  const code = prompt('Enter session passcode to view player list:');
+  if (!code) return;
+  const key = code.toLowerCase().replace(/[^a-z0-9]/g, '');
+  getDb().ref('sessions/' + key).once('value').then(snap => {
+    if (snap.exists() || code === ADMIN_CODE || code === ORGANIZER_CODE) {
+      window.signupUnlocked = true;
+      const date = new URLSearchParams(window.location.search).get('signup');
+      loadSignups(date);
+    } else {
+      alert('Invalid passcode.');
+    }
+  });
+}
+
+let signupSearchTimer = null;
+let selectedDupr = 0;
+let scannedMember = null;
+
+function onSignupInput() {
+  selectedDupr = 0;
+  scannedMember = null;
+  const val = document.getElementById('signupName').value.trim();
+  const box = document.getElementById('signupSuggestions');
+  if (val.length < 2) { box.style.display = 'none'; return; }
+  clearTimeout(signupSearchTimer);
+  signupSearchTimer = setTimeout(async () => {
+    try {
+      const res = await fetch(CLUB_API + '/club-members/search?name=' + encodeURIComponent(val));
+      const data = await res.json();
+      if (data.matches && data.matches.length) {
+        box.style.display = 'block';
+        box.innerHTML = data.matches.map(m =>
+          `<div onclick="selectMember('${m.name.replace(/'/g,"\\'")}','${m.rating||''}','')" style="padding:10px 12px;cursor:pointer;border-bottom:1px solid #1a1a2e;font-size:14px" onmouseover="this.style.background='#16213e'" onmouseout="this.style.background=''">` +
+          `<span style="color:#eee">${m.name}</span> <span style="color:#4ecca3;font-size:12px">${m.rating || 'NR'}</span></div>`
+        ).join('');
+      } else {
+        box.style.display = 'none';
+      }
+    } catch (e) { box.style.display = 'none'; }
+  }, 400);
+}
+
+function selectMember(name, rating, pcNumber) {
+  document.getElementById('signupName').value = name;
+  selectedDupr = parseFloat(rating) || 0;
+  document.getElementById('signupSuggestions').style.display = 'none';
+  document.getElementById('scanStatus').textContent = '✅ ' + name + ' (Rating: ' + (rating || 'N/A') + ', PC#' + pcNumber + ')';
+  document.getElementById('scanStatus').style.color = '#4ecca3';
+}
+
+function lookupPCN() {
+  const pcn = document.getElementById('signupPCN').value.trim();
+  if (!pcn) return;
+  const status = document.getElementById('scanStatus');
+  status.textContent = '🔄 Looking up PC#' + pcn + '...';
+  status.style.color = '#aaa';
+  getDb().ref('members/' + pcn).once('value').then(snap => {
+    const member = snap.val();
+    if (member) {
+      document.getElementById('signupName').value = member.name;
+      selectedDupr = parseFloat(member.rating) || 0;
+      scannedMember = { name: member.name, rating: member.rating || '0', pcNumber: pcn };
+      status.innerHTML = `✅ Found: <strong>${member.name}</strong> | Rating: ${member.rating || 'N/A'}`;
+      status.style.color = '#4ecca3';
+    } else {
+      status.textContent = '❌ PC#' + pcn + ' not found. Scan your card first to register.';
+      status.style.color = '#ff6b6b';
+    }
+  });
+}
+
+function selectSuggestion(name, dupr) {
+  document.getElementById('signupName').value = name;
+  selectedDupr = dupr;
+  document.getElementById('signupSuggestions').style.display = 'none';
+}
+
+async function addSignup() {
+  const params = new URLSearchParams(window.location.search);
+  const date = params.get('signup');
+  const input = document.getElementById('signupName');
+  const name = input.value.trim();
+  if (!name) return;
+  const status = document.getElementById('signupStatus');
+  document.getElementById('signupSuggestions').style.display = 'none';
+  let clubRating = selectedDupr;
+
+  // Validate against club directory
+  if (!clubRating) {
+    status.textContent = '🔄 Checking club membership...';
+    status.style.color = '#aaa';
+    try {
+      const res = await fetch(CLUB_API + '/club-members/search?name=' + encodeURIComponent(name));
+      const data = await res.json();
+      if (data.matches && data.matches.length) {
+        const norm = s => s.toLowerCase().replace(/[^a-z]/g, '');
+        const exact = data.matches.find(m => norm(m.name) === norm(name));
+        if (exact) clubRating = parseFloat(exact.rating) || 0;
+        else clubRating = parseFloat(data.matches[0].rating) || 0;
+      }
+    } catch (e) {}
+  }
+
+  if (!clubRating && !selectedDupr) {
+    status.textContent = '❌ "' + name + '" not found in club directory. Select your name from the suggestions.';
+    status.style.color = '#ff6b6b';
+    return;
+  }
+
+  // Check for duplicate
+  const snap = await signupRef(date).once('value');
+  const existing = snap.val() || {};
+  const norm = s => s.toLowerCase().replace(/[^a-z]/g, '');
+  if (Object.values(existing).some(p => norm(p.name) === norm(name))) {
+    status.textContent = '⚠️ ' + name + ' is already signed up.';
+    status.style.color = '#f0a500';
+    return;
+  }
+
+  // Fetch DUPR in background
+  let dupr = 0;
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    const res = await fetch(DUPR_PROXY + '/lookup?name=' + encodeURIComponent(name), { signal: controller.signal });
+    clearTimeout(timeout);
+    const data = await res.json();
+    dupr = data.dupr || 0;
+  } catch (e) {}
+
+  signupRef(date).push({ name, clubRating: clubRating || 0, dupr: dupr || 0, ts: Date.now() });
+  input.value = '';
+  selectedDupr = 0;
+  scannedMember = null;
+  const ratingInfo = [clubRating ? 'Club: ' + clubRating : '', dupr ? 'DUPR: ' + dupr.toFixed(2) : ''].filter(Boolean).join(' | ');
+  status.textContent = `✅ Added ${name}` + (ratingInfo ? ` (${ratingInfo})` : '');
+  status.style.color = '#4ecca3';
+}
+
+function removeSignup(date, key) {
+  signupRef(date).child(key).remove();
+}
+
+// --- Card Scanning ---
+let scanStream = null;
+
+function startScan() {
+  const video = document.getElementById('scanVideo');
+  document.getElementById('scanArea').style.display = 'block';
+  document.getElementById('scanStatus').textContent = '📷 Point camera at membership card...';
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1280 } } })
+    .then(stream => { scanStream = stream; video.srcObject = stream; })
+    .catch(() => { document.getElementById('scanStatus').textContent = '❌ Camera access denied.'; });
+}
+
+function stopScan() {
+  if (scanStream) { scanStream.getTracks().forEach(t => t.stop()); scanStream = null; }
+  document.getElementById('scanArea').style.display = 'none';
+  document.getElementById('scanStatus').textContent = '';
+}
+
+async function uploadCard(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  document.getElementById('scanStatus').textContent = '🔄 Reading card... (may take a few seconds)';
+  document.getElementById('scanStatus').style.color = '#aaa';
+  try {
+    const { data } = await Tesseract.recognize(file, 'eng');
+    processOCR(data);
+  } catch (e) {
+    document.getElementById('scanStatus').textContent = '❌ OCR error: ' + e.message;
+    document.getElementById('scanStatus').style.color = '#ff6b6b';
+  }
+  event.target.value = '';
+}
+
+async function captureCard() {
+  const video = document.getElementById('scanVideo');
+  const canvas = document.getElementById('scanCanvas');
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+  stopScan();
+  document.getElementById('scanStatus').textContent = '🔄 Reading card... (may take a few seconds)';
+  try {
+    const { data } = await Tesseract.recognize(canvas, 'eng');
+    processOCR(data);
+  } catch (e) {
+    document.getElementById('scanStatus').textContent = '❌ OCR error: ' + e.message;
+    document.getElementById('scanStatus').style.color = '#ff6b6b';
+  }
+}
+
+function processOCR(data) {
+  const parsed = parseCard(data.text);
+  if (parsed.name && parsed.pcNumber) {
+    getDb().ref('members/' + parsed.pcNumber).set({ name: parsed.name, rating: parsed.rating || '', pcNumber: parsed.pcNumber, scannedAt: Date.now() });
+    document.getElementById('signupName').value = parsed.name;
+    selectedDupr = parseFloat(parsed.rating) || 0;
+    scannedMember = { name: parsed.name, rating: parsed.rating || '0', pcNumber: parsed.pcNumber };
+    document.getElementById('scanStatus').innerHTML = `✅ Scanned: <strong>${parsed.name}</strong> | Rating: ${parsed.rating || 'N/A'} | PC#: ${parsed.pcNumber}`;
+    document.getElementById('scanStatus').style.color = '#4ecca3';
+  } else if (parsed.name) {
+    document.getElementById('signupName').value = parsed.name;
+    selectedDupr = parseFloat(parsed.rating) || 0;
+    scannedMember = { name: parsed.name, rating: parsed.rating || '0', pcNumber: '' };
+    document.getElementById('scanStatus').textContent = '✅ Got "' + parsed.name + '". Tap Join to sign up.';
+    document.getElementById('scanStatus').style.color = '#4ecca3';
+  } else {
+    document.getElementById('scanStatus').textContent = '❌ Couldn\'t read the card. Try better lighting or angle.';
+    document.getElementById('scanStatus').style.color = '#ff6b6b';
+    const lines = data.text.split('\n').filter(l => l.trim().length > 2);
+    if (lines.length) {
+      document.getElementById('scanStatus').innerHTML += '<br><small style="color:#aaa">Detected: ' + lines.slice(0, 5).join(' | ') + '</small>';
+    }
+  }
+}
+
+function parseCard(text) {
+  const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 1);
+  let name = '', rating = '', pcNumber = '';
+  // Find PC number - various OCR formats
+  const pcMatch = text.match(/(?:Pickleball|Canada|No)[:\s#]*(\d{5,})/i) || text.match(/\b(\d{6})\b/);
+  if (pcMatch) pcNumber = pcMatch[1];
+  // Find rating (a number like 3.0, 3.5, 4.0, 4.5, 5.0)
+  const ratingMatch = text.match(/\b([2-5]\.\d)\b/);
+  if (ratingMatch) rating = ratingMatch[1];
+  // Find name — skip known labels
+  const skip = /pickleball|club|st\.?\s*albert|member|active|edmonton|calgary|good\s*to|canada|resident|non.resident|adult|interest|volunteer|phone|rating|no\s*rating|\d{3}.\d{3}.\d{4}|\d{4}-\d{2}-\d{2}|202\d/i;
+  for (const line of lines) {
+    if (skip.test(line)) continue;
+    if (/^\d+$/.test(line)) continue;
+    // Look for 2-3 word names
+    const cleaned = line.replace(/[^a-zA-Z\s'-]/g, '').trim();
+    const words = cleaned.split(/\s+/).filter(w => w.length > 1);
+    if (words.length >= 2 && words.length <= 4 && cleaned.length > 4 && cleaned.length < 40) {
+      name = cleaned;
+      break;
+    }
+  }
+  // Fallback: find any line with at least 2 words that starts with uppercase
+  if (!name) {
+    for (const line of lines) {
+      if (skip.test(line)) continue;
+      const cleaned = line.replace(/[^a-zA-Z\s'-]/g, '').trim();
+      const words = cleaned.split(/\s+/).filter(w => w.length > 1);
+      if (words.length >= 2 && /^[A-Z]/i.test(words[0])) {
+        name = cleaned;
+        break;
+      }
+    }
+  }
+  console.log('OCR text:', text);
+  console.log('Parsed:', { name, rating, pcNumber });
+  return { name, rating, pcNumber };
+}
+
+function createSignupLink() {
+  const adminInput = document.getElementById('newSignupDate');
+  const orgInput = document.getElementById('orgSignupDate');
+  const input = adminInput && adminInput.value ? adminInput : orgInput;
+  const date = input.value.trim().toUpperCase().replace(/\s+/g, '-');
+  if (!date) return;
+  getDb().ref('signups/' + date + '/active').set(true).then(() => {
+    const link = window.location.origin + '?signup=' + date;
+    const msg = '✅ <a href="' + link + '" target="_blank" style="color:#4ecca3">' + link + '</a>';
+    if (document.getElementById('signupLinkMsg')) document.getElementById('signupLinkMsg').innerHTML = msg;
+    if (document.getElementById('orgSignupMsg')) document.getElementById('orgSignupMsg').innerHTML = msg;
+    input.value = '';
+    loadOrganizerSignups();
+  });
+}
+
+function loadOrganizerSignups() {
+  getDb().ref('signups').once('value').then(snap => {
+    const data = snap.val();
+    const el = document.getElementById('orgActiveList');
+    if (!el) return;
+    if (!data) { el.textContent = 'No signups yet.'; return; }
+    const active = Object.entries(data).filter(([k, v]) => v.active);
+    if (!active.length) { el.textContent = 'No signups yet.'; return; }
+    el.innerHTML = '<div style="margin-top:6px;font-weight:600;color:#eee">Active signups:</div>' + active.map(([date, v]) => {
+      const count = v.players ? Object.keys(v.players).length : 0;
+      const link = window.location.origin + '?signup=' + date;
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #333"><a href="${link}" style="color:#4ecca3;text-decoration:none">${date.replace(/-/g, ' ')}</a> <span style="color:#666">(${count})</span><button onclick="deleteSignupDate('${date}')" style="margin:0;padding:2px 8px;font-size:11px;background:#e94560">✕</button></div>`;
+    }).join('');
+  });
+}
+
+function createOrgSession() {
+  const input = document.getElementById('orgSessionCode').value.trim();
+  if (!input) return;
+  const key = input.toLowerCase().replace(/[^a-z0-9]/g, '');
+  getDb().ref('sessions/' + key).set({ name: input, created: new Date().toISOString() }).then(() => {
+    sessionKey = key;
+    sessionStorage.setItem('pb_session', input);
+    doUnlock();
+  });
+}
+
+function deleteSignupDate(date) {
+  if (!confirm('Delete signup "' + date.replace(/-/g, ' ') + '" and all its players?')) return;
+  getDb().ref('signups/' + date).remove().then(() => loadOrganizerSignups());
+}
+
+function loadOrgSessions() {
+  getDb().ref('sessions').once('value').then(snap => {
+    const data = snap.val();
+    const el = document.getElementById('orgExistingSessions');
+    if (!data) { el.innerHTML = '<div style="color:#aaa">No sessions yet.</div>'; return; }
+    el.innerHTML = '<div style="margin-top:6px;font-weight:600;color:#eee">Active sessions:</div>' +
+      Object.entries(data).map(([k, v]) =>
+        `<div style="padding:6px 0;border-bottom:1px solid #333"><span style="color:#eee;cursor:pointer" onclick="joinFromAdmin('${k}','${(v.name||k).replace(/'/g,"\\'")}')">${v.name || k}</span> <small style="color:#666">${v.created ? '· ' + new Date(v.created).toLocaleDateString() : ''}</small></div>`
+      ).join('');
+  });
+}
+
+function loadActiveSignups() {
+  getDb().ref('signups').once('value').then(snap => {
+    const data = snap.val();
+    const el = document.getElementById('activeSignupList');
+    if (!data) { el.textContent = 'No open signups.'; return; }
+    const active = Object.entries(data).filter(([k, v]) => v.active);
+    if (!active.length) { el.textContent = 'No open signups.'; return; }
+    el.innerHTML = active.map(([date, v]) => {
+      const count = v.players ? Object.keys(v.players).length : 0;
+      const link = window.location.origin + '?signup=' + date;
+      return `<div style="padding:6px 0;border-bottom:1px solid #333"><a href="${link}" style="color:#4ecca3;text-decoration:none;font-weight:600">${date.replace(/-/g, ' ')}</a> <span style="color:#666">(${count} player${count !== 1 ? 's' : ''})</span></div>`;
+    }).join('');
+  });
+}
+
+// Load active signups on page load (unless in signup mode)
+if (!new URLSearchParams(window.location.search).get('signup')) {
+  document.addEventListener('DOMContentLoaded', loadActiveSignups);
+}
 
 // --- Session & Admin ---
 const DEFAULT_ADMIN_CODE = 'adminpickle2026';
+const DEFAULT_ORGANIZER_CODE = 'organize2026';
 let ADMIN_CODE = null;
+let ORGANIZER_CODE = null;
 
 function loadAdminCode() {
-  return getDb().ref('config/adminCode').once('value').then(snap => {
-    ADMIN_CODE = snap.val() || DEFAULT_ADMIN_CODE;
-  });
+  return Promise.all([
+    getDb().ref('config/adminCode').once('value').then(snap => { ADMIN_CODE = snap.val() || DEFAULT_ADMIN_CODE; }),
+    getDb().ref('config/organizerCode').once('value').then(snap => { ORGANIZER_CODE = snap.val() || DEFAULT_ORGANIZER_CODE; })
+  ]);
 }
 
 function changeAdminCode() {
@@ -177,6 +621,16 @@ function changeAdminCode() {
     ADMIN_CODE = val;
     document.getElementById('newAdminCode').value = '';
     document.getElementById('adminCodeMsg').textContent = '✅ Admin passcode updated.';
+  });
+}
+
+function changeOrgCode() {
+  const val = document.getElementById('newOrgCode').value.trim();
+  if (!val || val.length < 4) { document.getElementById('orgCodeMsg').textContent = 'Must be at least 4 characters.'; return; }
+  getDb().ref('config/organizerCode').set(val).then(() => {
+    ORGANIZER_CODE = val;
+    document.getElementById('newOrgCode').value = '';
+    document.getElementById('orgCodeMsg').textContent = '✅ Organizer passcode updated.';
   });
 }
 let sessionKey = '';
@@ -206,6 +660,13 @@ function checkPasscode() {
       document.getElementById('lockError').textContent = '';
       document.getElementById('adminPanel').style.display = 'block';
       loadExistingSessions();
+      return;
+    }
+    if (input === ORGANIZER_CODE) {
+      document.getElementById('lockError').textContent = '';
+      document.getElementById('organizerPanel').style.display = 'block';
+      loadOrganizerSignups();
+      loadOrgSessions();
       return;
     }
     const key = input.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -297,6 +758,12 @@ function switchSession() {
   location.reload();
 }
 
+function logout() {
+  if (db) db.off();
+  sessionStorage.removeItem('pb_session');
+  location.reload();
+}
+
 function initApp() {
   getDb();
   db = firebase.database().ref(sessionKey + '/game');
@@ -320,6 +787,9 @@ function initApp() {
   initDocInput();
   fetchSchedule();
   renderPlayerList(dummyNames.slice(0, 8));
+  if (sessionKey === 'pickle2026') {
+    document.getElementById('scheduleSection').style.display = 'block';
+  }
 } // end initApp
 
 function updateSyncStatus(msg) {
@@ -418,6 +888,11 @@ function getCourts() {
     courts.push(state.players.slice(i, i + 4));
   }
   return courts;
+}
+
+function toggleMoreActions() {
+  const el = document.getElementById('moreActions');
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
 }
 
 let swapMode = false, swapFirst = null;
@@ -578,57 +1053,42 @@ function render() {
   });
   const courts = getCourts();
   const numCourts = courts.length;
-  const noResults = Object.keys(state.pendingResults).length === 0;
   let html = '';
-  if (noResults) {
-    html += `<div style="text-align:center;margin-bottom:8px"><button onclick="toggleSwapMode()" style="background:${swapMode ? '#f7d716;color:#1a1a2e' : '#0f3460'};font-size:13px;padding:6px 14px">${swapMode ? '✕ Cancel Swap' : '🔀 Swap Players'}</button></div>`;
-    if (swapMode) html += `<div class="swap-bar">${swapFirst !== null ? '👆 Now tap the second player to swap with <strong>' + state.players[swapFirst].name + '</strong>' : '👆 Tap a player to select, then tap another to swap'}</div>`;
-  }
+  if (swapMode) html += `<div class="swap-bar">${swapFirst !== null ? '👆 Now tap the second player to swap with <strong>' + state.players[swapFirst].name + '</strong>' : '👆 Tap a player to select, then tap another to swap'}</div>`;
   courts.forEach((court, ci) => {
     const allResolved = state.pendingResults[ci] !== undefined;
-    html += `<div class="court"><h2>Court ${(state.courtLabels && state.courtLabels[ci]) || ci + 1}</h2>`;
-    html += `<div class="players-list" style="margin-bottom:10px">`;
-    court.forEach((p, si) => {
-      const gi = ci * 4 + si;
-      const sel = swapMode && swapFirst === gi ? ' swap-sel' : '';
-      const sm = swapMode && noResults ? ' swap-mode' : '';
-      const drag = swapMode && noResults ? ` draggable="true" ondragstart="event.dataTransfer.setData('idx','${gi}')" ondragover="event.preventDefault()" ondrop="doSwap(parseInt(event.dataTransfer.getData('idx')),${gi})"` : '';
-      const click = swapMode && noResults ? ` onclick="swapPlayer(${gi})"` : '';
-      html += `<div class="player${sel}${sm}"${drag}${click}><span class="seed-num">#${si+1}</span>${p.name}${p.dupr ? '<span class="dupr-badge">' + p.dupr.toFixed(3) + '</span>' : ''}<span class="consec">${p.consecLosses > 0 ? ' (L×' + p.consecLosses + ')' : ''}</span></div>`;
-    });
-    html += `</div>`;
-    html += `<div class="matchups">`;
+    const cl = (state.courtLabels && state.courtLabels[ci]) || ci + 1;
+    html += `<div class="court"><h2>Court ${cl}</h2>`;
+    html += `<div class="matchups"><div class="match">`;
     const tA = [court[0], court[3]];
     const tB = [court[1], court[2]];
-    html += `<div class="match">`;
-    html += `<div style="color:#4ecca3;font-size:14px;font-weight:600;margin-bottom:4px">⬆ Top of the Court</div>`;
-    html += `<div class="team"><span class="name">${tA[0].name}${fmtDupr(tA[0])} & ${tA[1].name}${fmtDupr(tA[1])}</span></div>`;
+    // Top team
+    html += `<div class="team"><span class="name">`;
+    html += swapMode ? tA.map((p, ti) => { const gi = ci*4+([0,3][ti]); const sel = swapFirst===gi?' swap-sel':''; return `<span class="player${sel} swap-mode" onclick="swapPlayer(${gi})">${p.name}${fmtDupr(p)}</span>`; }).join(' & ') : `${tA[0].name}${fmtDupr(tA[0])} & ${tA[1].name}${fmtDupr(tA[1])}`;
+    html += `</span></div>`;
     html += `<div class="vs">VS</div>`;
-    html += `<div style="color:#e94560;font-size:14px;font-weight:600;margin-bottom:4px">⬇ Bottom of the Court</div>`;
-    html += `<div class="team"><span class="name">${tB[0].name}${fmtDupr(tB[0])} & ${tB[1].name}${fmtDupr(tB[1])}</span></div>`;
+    // Bottom team
+    html += `<div class="team"><span class="name">`;
+    html += swapMode ? tB.map((p, ti) => { const gi = ci*4+([1,2][ti]); const sel = swapFirst===gi?' swap-sel':''; return `<span class="player${sel} swap-mode" onclick="swapPlayer(${gi})">${p.name}${fmtDupr(p)}</span>`; }).join(' & ') : `${tB[0].name}${fmtDupr(tB[0])} & ${tB[1].name}${fmtDupr(tB[1])}`;
+    html += `</span></div>`;
     if (!allResolved) {
       if (state.duprMode) {
         html += `<div style="display:flex;align-items:center;justify-content:center;gap:8px;margin:8px 0">`;
-        html += `<span style="color:#4ecca3;font-size:13px">Top</span>`;
         html += `<input type="number" id="scoreA_${ci}" min="0" max="15" style="width:48px;padding:6px;border-radius:6px;border:none;background:#16213e;color:#4ecca3;font-size:16px;text-align:center" placeholder="0">`;
-        html += `<span style="color:#aaa;font-size:13px">–</span>`;
+        html += `<span style="color:#aaa">–</span>`;
         html += `<input type="number" id="scoreB_${ci}" min="0" max="15" style="width:48px;padding:6px;border-radius:6px;border:none;background:#16213e;color:#e94560;font-size:16px;text-align:center" placeholder="0">`;
-        html += `<span style="color:#e94560;font-size:13px">Bot</span>`;
         html += `</div>`;
-        html += `<button onclick="recordScore(${ci})">✅ Submit Score</button>`;
+        html += `<button onclick="recordScore(${ci})">✅ Submit</button>`;
       } else {
-        html += `<button onclick="recordResult(${ci},'A')">🏆 Top Wins</button>`;
-        html += `<button onclick="recordResult(${ci},'B')" style="background:#0f3460;margin-top:4px">🏆 Bottom Wins</button>`;
+        html += `<div style="display:flex;gap:8px;margin-top:8px"><button onclick="recordResult(${ci},'A')" style="flex:1">🏆 Top</button>`;
+        html += `<button onclick="recordResult(${ci},'B')" style="flex:1;background:#0f3460">🏆 Bottom</button></div>`;
       }
     } else {
       const r = state.pendingResults[ci];
       const isObj = typeof r === 'object';
       const winner = isObj ? r.winner : r;
-      if (isObj) {
-        html += `<div style="text-align:center;color:#4ecca3;margin-top:8px;font-weight:600">✓ ${winner === 'A' ? 'Top' : 'Bottom'} wins ${r.scoreA}–${r.scoreB}</div>`;
-      } else {
-        html += `<div style="text-align:center;color:#4ecca3;margin-top:8px;font-weight:600">✓ Winner: ${winner === 'A' ? 'Top' : 'Bottom'}</div>`;
-      }
+      const label = winner === 'A' ? 'Top' : 'Bottom';
+      html += `<div style="text-align:center;color:#4ecca3;margin-top:8px;font-weight:600">✓ ${label} wins${isObj ? ' ' + r.scoreA + '–' + r.scoreB : ''}</div>`;
       html += `<button onclick="clearResult(${ci})" style="background:#0f3460;margin-top:4px;font-size:12px">↩ Change</button>`;
     }
     html += `</div></div></div>`;
@@ -880,8 +1340,36 @@ function sortByDupr() {
 }
 
 function showDuprLogin() {
-  document.getElementById('duprModal').style.display = 'block';
-  document.getElementById('duprStatus').textContent = '';
+  fetchDuprViaWorker();
+}
+
+async function fetchDuprViaWorker() {
+  const names = getPlayerNames();
+  if (!names.length) return alert('Add players first.');
+  const duprs = getPlayerDuprs();
+  const status = document.getElementById('duprStatus');
+  const modal = document.getElementById('duprModal');
+  modal.style.display = 'block';
+  status.textContent = '🔄 Fetching DUPR ratings...';
+  status.style.color = '#aaa';
+  let found = 0;
+  for (let i = 0; i < names.length; i++) {
+    status.textContent = `🔄 Looking up ${names[i]}... (${i+1}/${names.length})`;
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10000);
+      const res = await fetch(duprUrl('/lookup?name=' + encodeURIComponent(names[i])), { signal: controller.signal });
+      clearTimeout(timeout);
+      const data = await res.json();
+      if (data.dupr > 0) { duprs[i] = data.dupr; found++; }
+    } catch (e) {}
+  }
+  const combined = names.map((n, i) => ({ n, d: duprs[i] }));
+  combined.sort((a, b) => b.d - a.d);
+  renderPlayerList(combined.map(p => p.n), combined.map(p => p.d));
+  status.style.color = '#4ecca3';
+  status.textContent = `✅ Found DUPR ratings for ${found}/${names.length} players (sorted by rating).`;
+  setTimeout(() => { modal.style.display = 'none'; }, 3000);
 }
 
 function fuzzyMatchPlayer(name, hits) {
@@ -1246,6 +1734,44 @@ function onDateSelect() {
   renderPlayerList(players);
   const courts = Math.floor(players.length / 4);
   document.getElementById('courtNumbers').value = Array.from({length: courts}, (_, i) => i + 1).join(', ');
+}
+
+function loadFromSignups() {
+  getDb().ref('signups').once('value').then(snap => {
+    const data = snap.val();
+    if (!data) { alert('No signup sheets found.'); return; }
+    const active = Object.entries(data).filter(([k, v]) => v.active && v.players);
+    if (!active.length) { alert('No signup sheets with players found.'); return; }
+    let html = '<div style="background:#16213e;padding:16px;border-radius:8px;margin-bottom:12px"><label style="font-weight:600;color:#eee">Select a signup sheet:</label>';
+    active.forEach(([date, v]) => {
+      const count = Object.keys(v.players).length;
+      html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px;margin:4px 0;background:#0f3460;border-radius:6px;cursor:pointer" onclick="applySignupSheet('${date}')">`;
+      html += `<span style="color:#4ecca3;font-weight:600">${date.replace(/-/g, ' ')}</span>`;
+      html += `<span style="color:#aaa">${count} players</span></div>`;
+    });
+    html += '</div>';
+    const container = document.createElement('div');
+    container.id = 'signupSheetPicker';
+    container.innerHTML = html;
+    const existing = document.getElementById('signupSheetPicker');
+    if (existing) existing.remove();
+    document.getElementById('playerList').before(container);
+  });
+}
+
+function applySignupSheet(date) {
+  getDb().ref('signups/' + date + '/players').once('value', snap => {
+    const data = snap.val();
+    if (!data) return;
+    const entries = Object.values(data).sort((a, b) => a.ts - b.ts);
+    const names = entries.map(e => e.name);
+    const duprs = entries.map(e => e.dupr || e.clubRating || 0);
+    renderPlayerList(names, duprs);
+    const courts = Math.floor(names.length / 4);
+    document.getElementById('courtNumbers').value = Array.from({length: courts}, (_, i) => i + 1).join(', ');
+    const picker = document.getElementById('signupSheetPicker');
+    if (picker) picker.remove();
+  });
 }
 </script>
 </body>
