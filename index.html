@@ -948,15 +948,15 @@ function logout() {
 }
 
 const FORMAT_INFO = {
-  classic: '<strong>🏆 King of the Court</strong><br>Players seeded by rating across courts. Teams: #1+#4 vs #2+#3. Winners stay, losers drop. Bottom loser drops to the court below, top winner from below promotes up. 2 consecutive losses = extra drop. Goal: fight to Court 1 and stay there.',
-  dupr: '<strong>📊 DUPR Recordable</strong><br>Same as King of the Court but requires entering scores. Records all games with players and scores in a match log. At end of session, use the log to enter games on dupr.gg for official rating updates.',
-  roundrobin: '<strong>🔄 Round Robin</strong><br>Everyone plays against everyone. Teams are shuffled each round. Live standings track wins/losses/percentage. Best for 8-12 players. Fair — everyone plays the same number of games.',
-  balancedrr: '<strong>⚖️ Balanced Round Robin</strong><br>Same as Round Robin but teams are formed by rating (strongest + weakest paired together via snake draft). Creates more competitive, balanced matchups.',
-  random: '<strong>🎲 Random Mix</strong><br>Teams are completely shuffled randomly each round. No seeding, no strategy — just fun. Good for social play where you want to mix with everyone.',
-  ladder: '<strong>🪜 Ladder</strong><br>Players ranked by rating. Adjacent players on the ladder play each other. Win = move up, lose = move down. The ladder reorders after each round based on cumulative record.',
-  swiss: '<strong>🧩 Swiss</strong><br>Players with similar win/loss records are matched each round. After a few rounds, strong players face strong, weak face weak. Finds the best players without a full round robin. Good for larger groups.',
-  elimination: '<strong>💀 Double Elimination</strong><br>You need 2 losses to be eliminated. First loss sends you to the losers bracket. Second loss = out. Gives everyone a second chance. Works best with fixed partners.',
-  fixed: '<strong>🤝 Fixed Partners</strong><br>Same partners for the entire session. Teams rotate opponents each round. Good for practicing with a specific partner or running a team-based competition.'
+  classic: '<strong>🏆 King of the Court</strong><br><br><strong>How it works:</strong><br>1. Players seeded by rating across courts (4 per court). Court 1 is the "top" court.<br>2. Teams each round: #1+#4 (Top) vs #2+#3 (Bottom)<br>3. Winners become Seeds 1 & 2, losers become Seeds 3 & 4<br>4. Seed 4 (bottom loser) drops to the court below as Seed 1<br>5. Top winner from the court below promotes up as Seed 4<br>6. 2 consecutive losses = extra drop<br><br><strong>Goal:</strong> Fight your way to Court 1 and stay there. Best players naturally rise to the top.',
+  dupr: '<strong>📊 DUPR Recordable</strong><br><br><strong>How it works:</strong><br>1. Same rotation as King of the Court<br>2. Requires entering scores (not just win/loss)<br>3. Records all games: winners, losers, and score<br>4. Match log shown during and after session<br>5. Use the log to enter games on dupr.gg for official rating updates<br><br><strong>Tip:</strong> Organizer can view all past DUPR logs from the organizer panel.',
+  roundrobin: '<strong>🔄 Round Robin</strong><br><br><strong>How it works:</strong><br>1. Teams shuffled randomly each round<br>2. Everyone plays — no one is eliminated<br>3. Live standings track individual wins/losses<br>4. Odd players sit out (bye rotates fairly)<br>5. Continue as many rounds as you want<br><br><strong>Best for:</strong> 8-12 players. Fair — everyone plays the same number of games.',
+  balancedrr: '<strong>⚖️ Balanced Round Robin</strong><br><br><strong>How it works:</strong><br>1. Players grouped by rating (strongest with weakest via snake draft)<br>2. Creates balanced, competitive matchups each round<br>3. Live standings track individual wins/losses<br>4. Odd players sit out (bye rotates fairly)<br><br><strong>Best for:</strong> Groups with mixed skill levels. Ensures fair games.',
+  random: '<strong>🎲 Random Mix</strong><br><br><strong>How it works:</strong><br>1. All players shuffled completely randomly each round<br>2. New partners and opponents every game<br>3. No seeding, no strategy — pure fun<br>4. Standings track individual wins/losses<br>5. Odd players sit out (bye rotates fairly)<br><br><strong>Best for:</strong> Social play where you want to mix with everyone.',
+  ladder: '<strong>🪜 Ladder</strong><br><br><strong>How it works:</strong><br>1. Players ranked by rating/record<br>2. Adjacent players on the ladder play each other<br>3. Win = move up the ladder, lose = move down<br>4. Ladder reorders after each round based on cumulative record<br>5. Odd players sit out (bye rotates fairly)<br><br><strong>Goal:</strong> Climb to the top of the ladder and stay there.',
+  swiss: '<strong>🧩 Swiss</strong><br><br><strong>How it works:</strong><br>1. Round 1: random matchups (everyone is 0-0)<br>2. After each round, players grouped by similar win/loss record<br>3. Winners play winners, losers play losers<br>4. After a few rounds, naturally finds the strongest players<br>5. Everyone keeps playing — no elimination<br>6. Odd players sit out (bye rotates fairly)<br><br><strong>Best for:</strong> Larger groups where full round robin would take too long.',
+  elimination: '<strong>💀 Double Elimination</strong><br><br><strong>How it works:</strong><br>1. Everyone starts in the winners bracket<br>2. First loss → sent to losers bracket<br>3. Second loss → eliminated<br>4. Players seeded by rating<br>5. Gives everyone a second chance<br>6. Odd players sit out (bye rotates fairly)<br><br><strong>Best for:</strong> Tournament-style play with fixed partners. Finds a true champion.',
+  fixed: '<strong>🤝 Fixed Partners</strong><br><br><strong>How it works:</strong><br>1. Players paired in list order: #1+#2, #3+#4, #5+#6, etc.<br>2. Each round, teams face different opponents (no repeat matchups until all played)<br>3. Same partners the entire session<br>4. Team Standings shown (Team wins/losses, not individual)<br>5. Odd number of teams → one team sits out (bye rotates)<br><br><strong>Tip:</strong> Sort players by rating before starting so pairs are balanced (best + worst together): #1+#8, #2+#7, etc.'
 };
 
 function showFormatInfo() {
@@ -1091,7 +1091,43 @@ function generateMatchups(format) {
     const sorted = [...active].sort((a, b) => (b.wins - b.losses) - (a.wins - a.losses) || (b.dupr || 0) - (a.dupr || 0));
     for (let i = 0; i < sorted.length; i += 4) courts.push(sorted.slice(i, i + 4));
   } else if (format === 'fixed') {
-    for (let i = 0; i < active.length; i += 4) courts.push(active.slice(i, i + 4));
+    // Fixed partners: pair in order, rotate opponents
+    if (!state.teams) {
+      state.teams = [];
+      for (let i = 0; i < active.length; i += 2) {
+        if (i + 1 < active.length) state.teams.push({ players: [active[i], active[i+1]], wins: 0, losses: 0 });
+      }
+      state.fixedRound = 0;
+    }
+    // Generate all possible team matchups
+    const teams = state.teams;
+    const matchupList = [];
+    for (let i = 0; i < teams.length; i++) {
+      for (let j = i + 1; j < teams.length; j++) {
+        matchupList.push([i, j]);
+      }
+    }
+    // Pick matchups for this round (avoid repeats)
+    state.playedMatchups = state.playedMatchups || [];
+    const available = matchupList.filter(m => !state.playedMatchups.some(p => p[0] === m[0] && p[1] === m[1]));
+    const roundMatchups = available.length ? available : matchupList; // reset if all played
+    if (!available.length) state.playedMatchups = [];
+    // Assign to courts
+    const used = new Set();
+    const courts = [];
+    for (const [i, j] of roundMatchups) {
+      if (used.has(i) || used.has(j)) continue;
+      if (courts.length >= numCourts) break;
+      courts.push([...teams[i].players, ...teams[j].players]);
+      state.playedMatchups.push([i, j]);
+      used.add(i);
+      used.add(j);
+    }
+    // Teams not playing this round are bye
+    const playingTeams = new Set([...used]);
+    const byeTeams = teams.filter((t, idx) => !playingTeams.has(idx));
+    state.bye = byeTeams.flatMap(t => t.players.map(p => p.name));
+    return courts;
   } else if (format === 'roundrobin') {
     const shuffled = [...active].sort(() => Math.random() - 0.5);
     for (let i = 0; i < shuffled.length; i += 4) courts.push(shuffled.slice(i, i + 4));
@@ -1376,14 +1412,24 @@ function render() {
   }
 
   // Show standings for non-classic formats
-  if (state.gameFormat && state.gameFormat !== 'classic' && state.gameFormat !== 'dupr' && state.players.some(p => p.wins || p.losses)) {
-    const sorted = [...state.players].sort((a, b) => (b.wins - b.losses) - (a.wins - a.losses) || b.wins - a.wins);
-    let standingsHtml = '<div style="background:#0f3460;border-radius:8px;padding:12px;margin-top:12px"><h3 style="color:#e94560;margin:0 0 8px;font-size:14px">📊 Standings</h3>';
-    sorted.forEach((p, i) => {
-      standingsHtml += `<div style="display:flex;justify-content:space-between;padding:3px 8px;font-size:13px"><span>${i+1}. ${p.name}</span><span style="color:#4ecca3">${p.wins}W-${p.losses}L</span></div>`;
-    });
-    standingsHtml += '</div>';
-    document.getElementById('courts').innerHTML += standingsHtml;
+  if (state.gameFormat && state.gameFormat !== 'classic' && state.gameFormat !== 'dupr') {
+    if (state.gameFormat === 'fixed' && state.teams && state.teams.some(t => t.wins || t.losses)) {
+      const sorted = [...state.teams].sort((a, b) => (b.wins - b.losses) - (a.wins - a.losses) || b.wins - a.wins);
+      let standingsHtml = '<div style="background:#0f3460;border-radius:8px;padding:12px;margin-top:12px"><h3 style="color:#e94560;margin:0 0 8px;font-size:14px">📊 Team Standings</h3>';
+      sorted.forEach((t, i) => {
+        standingsHtml += `<div style="display:flex;justify-content:space-between;padding:3px 8px;font-size:13px"><span>${i+1}. ${t.players.map(p=>p.name).join(' & ')}</span><span style="color:#4ecca3">${t.wins}W-${t.losses}L</span></div>`;
+      });
+      standingsHtml += '</div>';
+      document.getElementById('courts').innerHTML += standingsHtml;
+    } else if (state.players.some(p => p.wins || p.losses)) {
+      const sorted = [...state.players].sort((a, b) => (b.wins - b.losses) - (a.wins - a.losses) || b.wins - a.wins);
+      let standingsHtml = '<div style="background:#0f3460;border-radius:8px;padding:12px;margin-top:12px"><h3 style="color:#e94560;margin:0 0 8px;font-size:14px">📊 Standings</h3>';
+      sorted.forEach((p, i) => {
+        standingsHtml += `<div style="display:flex;justify-content:space-between;padding:3px 8px;font-size:13px"><span>${i+1}. ${p.name}</span><span style="color:#4ecca3">${p.wins}W-${p.losses}L</span></div>`;
+      });
+      standingsHtml += '</div>';
+      document.getElementById('courts').innerHTML += standingsHtml;
+    }
   }
 
   // Restore unsaved score inputs
@@ -1578,7 +1624,22 @@ function resolveRound() {
       }
     }
   } else {
-    // Non-classic formats: regenerate matchups for next round
+    // Non-classic formats: update team records for fixed partners
+    if (format === 'fixed' && state.teams) {
+      for (let ci = 0; ci < numCourts; ci++) {
+        const r = state.pendingResults[ci];
+        const w = (typeof r === 'object') ? r.winner : r;
+        const court = courts[ci];
+        const winPlayers = w === 'A' ? [court[0].name, court[3].name] : [court[1].name, court[2].name];
+        const losePlayers = w === 'A' ? [court[1].name, court[2].name] : [court[0].name, court[3].name];
+        state.teams.forEach(t => {
+          const tNames = t.players.map(p => p.name);
+          if (winPlayers.every(n => tNames.includes(n))) t.wins++;
+          if (losePlayers.every(n => tNames.includes(n))) t.losses++;
+        });
+      }
+    }
+    // Regenerate matchups for next round
     state.matchups = generateMatchups(format);
   }
 
