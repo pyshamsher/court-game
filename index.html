@@ -61,15 +61,26 @@
   <div style="background:#16213e;padding:24px;border-radius:12px">
     <h2 style="color:#4ecca3;margin-bottom:4px">🏓 Pickleball Signup</h2>
     <div id="signupDate" style="font-size:20px;font-weight:700;color:#e94560;margin-bottom:16px"></div>
-    <div style="position:relative;margin-bottom:16px">
+    <div style="text-align:center;margin-bottom:12px">
+      <span onclick="document.getElementById('scanSheetBtn').style.display='block';this.style.display='none'" style="color:#444;cursor:pointer;font-size:18px;letter-spacing:4px">⋯</span>
+      <label id="scanSheetBtn" style="display:none;background:#0f3460;color:#fff;padding:10px;border-radius:8px;cursor:pointer;text-align:center;font-weight:600;font-size:13px">📋 Scan handwritten signup sheet<input type="file" accept="image/*" capture="environment" onchange="scanSignupSheetForSignup(event)" style="display:none"></label>
+      <small id="scanSheetTip" style="display:none;color:#666;font-size:11px">Write names in CAPS, one per line. Good light.</small>
+    </div>
+    <div style="position:relative;margin-bottom:12px">
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <span id="captchaQ" style="color:#aaa;font-size:14px;padding:10px 0;min-width:80px"></span>
+        <input type="text" id="captchaAnswer" placeholder="Answer" style="width:60px;padding:10px;border-radius:8px;border:none;background:#0f3460;color:#eee;font-size:16px;text-align:center">
+      </div>
       <div style="display:flex;gap:8px">
-        <input type="text" id="signupName" placeholder="Enter your name..." oninput="onSignupInput()" onkeydown="if(event.key==='Enter')addSignup()" style="flex:1;padding:10px;border-radius:8px;border:none;background:#0f3460;color:#eee;font-size:16px">
+        <input type="text" id="signupName" placeholder="Or type your name..." oninput="onSignupInput()" onkeydown="if(event.key==='Enter')addSignup()" style="flex:1;padding:10px;border-radius:8px;border:none;background:#0f3460;color:#eee;font-size:16px">
         <button onclick="addSignup()" style="margin:0;padding:10px 20px">Join</button>
       </div>
       <div id="signupSuggestions" style="display:none;position:absolute;top:46px;left:0;right:60px;background:#0f3460;border-radius:8px;border:1px solid #333;max-height:200px;overflow-y:auto;z-index:10;text-align:left"></div>
     </div>
+    <div id="scanStatus" style="font-size:12px;color:#aaa;margin-bottom:8px"></div>
     <div id="signupStatus" style="font-size:12px;color:#aaa;margin-bottom:12px"></div>
     <div id="signupList" style="text-align:left"></div>
+    <a href="/" style="display:block;margin-top:16px;color:#aaa;font-size:13px;text-decoration:none">← Back to main page</a>
   </div>
 </div>
 
@@ -96,15 +107,16 @@
         <div id="orgActiveList" style="margin-top:8px;font-size:13px"></div>
       </div>
       <div style="margin-top:12px;border-top:1px solid #333;padding-top:10px">
-        <label style="font-size:13px;color:#aaa">Create game session:</label>
-        <div style="display:flex;gap:6px;margin-top:4px">
-          <input type="text" id="orgSessionCode" placeholder="New session passcode" onkeydown="if(event.key==='Enter')createOrgSession()" style="flex:1;text-align:left">
-          <button onclick="createOrgSession()" style="margin:0;padding:8px 14px;background:#4ecca3;color:#1a1a2e;font-weight:700">Create</button>
-        </div>
+        <button onclick="showOrgDuprLogs()" style="background:#0f3460;font-size:13px">📊 View DUPR Match Logs</button>
+        <div id="orgDuprLogsView" style="display:none;margin-top:8px;max-height:300px;overflow-y:auto"></div>
       </div>
-      <div id="orgExistingSessions" style="margin-top:8px;font-size:13px"></div>
     </div>
     <div id="adminPanel" style="display:none;margin-top:16px;border-top:1px solid #333;padding-top:16px;text-align:left">
+      <div id="adminPasscodes"></div>
+      <div style="margin-bottom:12px">
+        <button onclick="showDuprLogs()" style="background:#0f3460;font-size:13px">📊 DUPR Match Logs</button>
+        <div id="duprLogsView" style="display:none;margin-top:8px;max-height:300px;overflow-y:auto"></div>
+      </div>
       <label style="font-weight:600;font-size:14px">🔧 Create New Session</label><br>
       <div style="display:flex;gap:6px;margin-top:8px">
         <input type="text" id="newSessionCode" placeholder="New session passcode" onkeydown="if(event.key==='Enter')createSession()" style="flex:1;text-align:left">
@@ -158,21 +170,34 @@
     <button onclick="loadFromSignups()" style="background:#0f3460;margin-bottom:12px">📋 Load from Signups</button>
     <label>Court Numbers (comma-separated, e.g. 3, 5, 7):</label>
     <input type="text" id="courtNumbers" value="1, 2" oninput="updateDummyNames()" style="width:200px;padding:8px;border-radius:8px;border:none;background:#0f3460;color:#eee;font-size:14px;margin-bottom:12px">
-    <label>Players (drag to reorder, edit if needed):</label>
-    <small>First player = Seed 1 (best). Total players must equal courts × 4.</small>
+    <label>Players:</label>
     <div id="playerList" style="margin-bottom:12px"></div>
-    <button onclick="addPlayerRow()" style="background:#0f3460;margin-bottom:8px">+ Add Player</button>
+    <div id="sessionScanStatus" style="font-size:12px;color:#aaa;margin-bottom:8px"></div>
+    <div style="position:relative;margin-bottom:8px">
+      <input type="text" id="sessionDuprSearch" placeholder="Search DUPR or type name..." oninput="onSessionDuprSearch()" onkeydown="if(event.key==='Enter')addTypedPlayer()" style="width:100%;padding:8px;border-radius:8px;border:none;background:#0f3460;color:#eee;font-size:13px">
+      <div id="sessionDuprSuggestions" style="display:none;position:absolute;top:38px;left:0;right:0;background:#0f3460;border-radius:8px;border:1px solid #333;max-height:150px;overflow-y:auto;z-index:10;text-align:left"></div>
+    </div>
     <button onclick="sortByDupr()" style="background:#0f3460;margin-bottom:8px">📊 Sort by DUPR</button>
     <button onclick="showDuprLogin()" style="background:#0f3460;margin-bottom:8px">🔍 Fetch DUPR Ratings</button>
     <div id="duprModal" style="display:none;background:#0f3460;padding:16px;border-radius:8px;margin-bottom:12px">
       <div id="duprStatus" style="font-size:13px;color:#aaa;white-space:pre-wrap"></div>
     </div>
-    <div style="display:flex;gap:8px;margin:10px 0">
-      <button onclick="startGame()" style="flex:1">▶ Start Classic</button>
-      <button onclick="startGame(true)" style="flex:1;background:#4ecca3;color:#1a1a2e;font-weight:700">📈 Start with DUPR Sim</button>
+    <div style="display:flex;gap:8px;margin:10px 0;align-items:center">
+      <select id="gameFormat" style="flex:1;padding:10px;border-radius:8px;border:none;background:#0f3460;color:#eee;font-size:14px">
+        <option value="classic">🏆 King of the Court</option>
+        <option value="dupr">📊 DUPR Recordable</option>
+        <option value="roundrobin">🔄 Round Robin</option>
+        <option value="balancedrr">⚖️ Balanced Round Robin (by rating)</option>
+        <option value="random">🎲 Random Mix</option>
+        <option value="ladder">🪜 Ladder</option>
+        <option value="swiss">🧩 Swiss (match by record)</option>
+        <option value="elimination">💀 Double Elimination</option>
+        <option value="fixed">🤝 Fixed Partners</option>
+      </select>
+      <button onclick="showFormatInfo()" style="margin:0;padding:10px 12px;background:#0f3460;font-size:13px">ℹ️</button>
     </div>
-    <button onclick="showPastSessions()" style="background:#0f3460">📜 Past Sessions</button>
-    <button onclick="switchSession()" style="background:#0f3460">🔑 Switch Session</button>
+    <div id="formatInfo" style="display:none;background:#0f3460;padding:12px;border-radius:8px;margin-bottom:10px;font-size:12px;color:#ccc;line-height:1.6"></div>
+    <button onclick="startGame()" style="width:100%;margin:10px 0">▶ Start Game</button>
     <button onclick="logout()" style="background:#0f3460">🚪 Logout</button>
   </div>
 </div>
@@ -230,6 +255,7 @@ function duprUrl(path) { return DUPR_PROXY + path; }
     getDb().ref('signups/' + signupDate + '/active').once('value').then(snap => {
       if (snap.val()) {
         loadSignups(signupDate);
+        generateCaptcha();
       } else {
         document.getElementById('signupStatus').textContent = '⚠️ This signup is not active. Ask your organizer for a valid link.';
         document.getElementById('signupStatus').style.color = '#ff6b6b';
@@ -291,19 +317,23 @@ function onSignupInput() {
   clearTimeout(signupSearchTimer);
   signupSearchTimer = setTimeout(async () => {
     try {
-      const res = await fetch(CLUB_API + '/club-members/search?name=' + encodeURIComponent(val));
+      const res = await fetch(DUPR_PROXY + '/search?name=' + encodeURIComponent(val));
       const data = await res.json();
-      if (data.matches && data.matches.length) {
-        box.style.display = 'block';
-        box.innerHTML = data.matches.map(m =>
-          `<div onclick="selectMember('${m.name.replace(/'/g,"\\'")}','${m.rating||''}','')" style="padding:10px 12px;cursor:pointer;border-bottom:1px solid #1a1a2e;font-size:14px" onmouseover="this.style.background='#16213e'" onmouseout="this.style.background=''">` +
-          `<span style="color:#eee">${m.name}</span> <span style="color:#4ecca3;font-size:12px">${m.rating || 'NR'}</span></div>`
-        ).join('');
-      } else {
-        box.style.display = 'none';
-      }
+      if (!data.hits || !data.hits.length) { box.style.display = 'none'; return; }
+      box.style.display = 'block';
+      box.innerHTML = data.hits.map(h =>
+        `<div onclick="selectSuggestion('${h.name.replace(/'/g,"\\'")}',${h.dupr})" style="padding:10px 12px;cursor:pointer;border-bottom:1px solid #1a1a2e;font-size:14px" onmouseover="this.style.background='#16213e'" onmouseout="this.style.background=''">` +
+        `<span style="color:#eee">${h.name}</span> <span style="color:#4ecca3;font-size:12px">${h.dupr ? h.dupr.toFixed(2) : 'NR'}</span>` +
+        `${h.location ? '<br><span style="color:#666;font-size:11px">'+h.location+'</span>' : ''}</div>`
+      ).join('');
     } catch (e) { box.style.display = 'none'; }
   }, 400);
+}
+
+function selectSuggestion(name, dupr) {
+  document.getElementById('signupName').value = name;
+  selectedDupr = dupr;
+  document.getElementById('signupSuggestions').style.display = 'none';
 }
 
 function selectMember(name, rating, pcNumber) {
@@ -341,6 +371,14 @@ function selectSuggestion(name, dupr) {
   document.getElementById('signupSuggestions').style.display = 'none';
 }
 
+let captchaAnswer = 0;
+function generateCaptcha() {
+  const a = Math.floor(Math.random() * 10) + 1;
+  const b = Math.floor(Math.random() * 10) + 1;
+  captchaAnswer = a + b;
+  document.getElementById('captchaQ').textContent = `${a} + ${b} = ?`;
+}
+
 async function addSignup() {
   const params = new URLSearchParams(window.location.search);
   const date = params.get('signup');
@@ -348,30 +386,16 @@ async function addSignup() {
   const name = input.value.trim();
   if (!name) return;
   const status = document.getElementById('signupStatus');
-  document.getElementById('signupSuggestions').style.display = 'none';
-  let clubRating = selectedDupr;
-
-  // Validate against club directory
-  if (!clubRating) {
-    status.textContent = '🔄 Checking club membership...';
-    status.style.color = '#aaa';
-    try {
-      const res = await fetch(CLUB_API + '/club-members/search?name=' + encodeURIComponent(name));
-      const data = await res.json();
-      if (data.matches && data.matches.length) {
-        const norm = s => s.toLowerCase().replace(/[^a-z]/g, '');
-        const exact = data.matches.find(m => norm(m.name) === norm(name));
-        if (exact) clubRating = parseFloat(exact.rating) || 0;
-        else clubRating = parseFloat(data.matches[0].rating) || 0;
-      }
-    } catch (e) {}
-  }
-
-  if (!clubRating && !selectedDupr) {
-    status.textContent = '❌ "' + name + '" not found in club directory. Select your name from the suggestions.';
+  // Validate captcha
+  const userAnswer = parseInt(document.getElementById('captchaAnswer').value);
+  if (userAnswer !== captchaAnswer) {
+    status.textContent = '❌ Wrong answer. Try again.';
     status.style.color = '#ff6b6b';
+    generateCaptcha();
+    document.getElementById('captchaAnswer').value = '';
     return;
   }
+  let clubRating = selectedDupr || (scannedMember ? parseFloat(scannedMember.rating) || 0 : 0);
 
   // Check for duplicate
   const snap = await signupRef(date).once('value');
@@ -384,6 +408,8 @@ async function addSignup() {
   }
 
   // Fetch DUPR in background
+  status.textContent = '🔄 Adding...';
+  status.style.color = '#aaa';
   let dupr = 0;
   try {
     const controller = new AbortController();
@@ -404,7 +430,103 @@ async function addSignup() {
 }
 
 function removeSignup(date, key) {
+  const answer = prompt('Solve to confirm: ' + captchaAnswer + ' - what was the math question answer?');
+  // Generate a new captcha for removal
+  const a = Math.floor(Math.random() * 10) + 1;
+  const b = Math.floor(Math.random() * 10) + 1;
+  const expected = a + b;
+  const userAnswer = parseInt(prompt(`To remove, solve: ${a} + ${b} = ?`));
+  if (userAnswer !== expected) { alert('Wrong answer. Player not removed.'); return; }
   signupRef(date).child(key).remove();
+}
+
+function dropFromSignup() {
+  const params = new URLSearchParams(window.location.search);
+  const date = params.get('signup');
+  const name = document.getElementById('dropName').value.trim();
+  if (!name) return;
+  const status = document.getElementById('signupStatus');
+  // Validate captcha
+  const userAnswer = parseInt(document.getElementById('captchaAnswer').value);
+  if (userAnswer !== captchaAnswer) {
+    status.textContent = '❌ Solve the math question first.';
+    status.style.color = '#ff6b6b';
+    generateCaptcha();
+    document.getElementById('captchaAnswer').value = '';
+    return;
+  }
+  const norm = s => s.toLowerCase().replace(/[^a-z]/g, '');
+  signupRef(date).once('value', snap => {
+    const players = snap.val() || {};
+    const match = Object.entries(players).find(([k, p]) => norm(p.name) === norm(name));
+    if (match) {
+      signupRef(date).child(match[0]).remove();
+      document.getElementById('dropName').value = '';
+      status.textContent = '✅ ' + name + ' removed from signup.';
+      status.style.color = '#4ecca3';
+    } else {
+      status.textContent = '❌ "' + name + '" not found in signup list.';
+      status.style.color = '#ff6b6b';
+    }
+    generateCaptcha();
+    document.getElementById('captchaAnswer').value = '';
+  });
+}
+
+async function scanSignupSheetForSignup(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const params = new URLSearchParams(window.location.search);
+  const date = params.get('signup');
+  const status = document.getElementById('scanStatus');
+  status.textContent = '🔄 Reading signup sheet...';
+  status.style.color = '#aaa';
+  try {
+    const { data } = await Tesseract.recognize(file, 'eng');
+    const lines = data.text.split('\n').map(l => l.trim()).filter(l => l.length > 2 && /[a-zA-Z]/.test(l));
+    const names = lines.map(l => l.replace(/^[\d.\-)\]]+\s*/, '').replace(/[^a-zA-Z\s'-]/g, '').trim())
+      .filter(n => {
+        const words = n.split(/\s+/);
+        // Must be 2-3 words, each at least 2 chars, looks like a name
+        return words.length >= 2 && words.length <= 3 && words.every(w => w.length >= 2) && n.length >= 5 && n.length <= 30;
+      });
+    if (!names.length) {
+      const raw = lines.slice(0, 8).join(' | ');
+      status.innerHTML = '❌ No valid names found.<br><small style="color:#aaa">Detected: ' + raw + '</small>';
+      status.style.color = '#ff6b6b';
+      event.target.value = '';
+      return;
+    }
+    // Check existing signups for duplicates
+    const snap = await signupRef(date).once('value');
+    const existing = snap.val() || {};
+    const norm = s => s.toLowerCase().replace(/[^a-z]/g, '');
+    const existingNames = new Set(Object.values(existing).map(p => norm(p.name)));
+    let added = 0, skipped = 0;
+    for (let i = 0; i < names.length; i++) {
+      if (existingNames.has(norm(names[i]))) { skipped++; continue; }
+      status.textContent = `🔄 Looking up ${names[i]}... (${i+1}/${names.length})`;
+      let dupr = 0;
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 6000);
+        const res = await fetch(DUPR_PROXY + '/lookup?name=' + encodeURIComponent(names[i]), { signal: controller.signal });
+        clearTimeout(timeout);
+        const d = await res.json();
+        dupr = d.dupr || 0;
+      } catch (e) {}
+      if (!dupr) continue; // Only add if DUPR found
+      signupRef(date).push({ name: names[i], clubRating: 0, dupr, ts: Date.now() });
+      existingNames.add(norm(names[i]));
+      added++;
+    }
+    status.textContent = `✅ Added ${added} players with DUPR ratings (${names.length - added - skipped} not found, ${skipped} duplicates)`;
+    status.style.color = '#4ecca3';
+  } catch (e) {
+    status.textContent = '❌ OCR error: ' + e.message;
+    status.style.color = '#ff6b6b';
+  }
+  event.target.value = '';
 }
 
 // --- Card Scanning ---
@@ -459,19 +581,16 @@ async function captureCard() {
 
 function processOCR(data) {
   const parsed = parseCard(data.text);
-  if (parsed.name && parsed.pcNumber) {
-    getDb().ref('members/' + parsed.pcNumber).set({ name: parsed.name, rating: parsed.rating || '', pcNumber: parsed.pcNumber, scannedAt: Date.now() });
+  if (parsed.name) {
     document.getElementById('signupName').value = parsed.name;
     selectedDupr = parseFloat(parsed.rating) || 0;
-    scannedMember = { name: parsed.name, rating: parsed.rating || '0', pcNumber: parsed.pcNumber };
-    document.getElementById('scanStatus').innerHTML = `✅ Scanned: <strong>${parsed.name}</strong> | Rating: ${parsed.rating || 'N/A'} | PC#: ${parsed.pcNumber}`;
+    scannedMember = { name: parsed.name, rating: parsed.rating || '0', pcNumber: parsed.pcNumber || '' };
+    if (parsed.pcNumber) {
+      getDb().ref('members/' + parsed.pcNumber).set({ name: parsed.name, rating: parsed.rating || '', pcNumber: parsed.pcNumber, scannedAt: Date.now() });
+    }
+    document.getElementById('scanStatus').innerHTML = `✅ Scanned: <strong>${parsed.name}</strong> | Rating: ${parsed.rating || 'N/A'}`;
     document.getElementById('scanStatus').style.color = '#4ecca3';
-  } else if (parsed.name) {
-    document.getElementById('signupName').value = parsed.name;
-    selectedDupr = parseFloat(parsed.rating) || 0;
-    scannedMember = { name: parsed.name, rating: parsed.rating || '0', pcNumber: '' };
-    document.getElementById('scanStatus').textContent = '✅ Got "' + parsed.name + '". Tap Join to sign up.';
-    document.getElementById('scanStatus').style.color = '#4ecca3';
+    addSignup();
   } else {
     document.getElementById('scanStatus').textContent = '❌ Couldn\'t read the card. Try better lighting or angle.';
     document.getElementById('scanStatus').style.color = '#ff6b6b';
@@ -548,8 +667,72 @@ function loadOrganizerSignups() {
     el.innerHTML = '<div style="margin-top:6px;font-weight:600;color:#eee">Active signups:</div>' + active.map(([date, v]) => {
       const count = v.players ? Object.keys(v.players).length : 0;
       const link = window.location.origin + '?signup=' + date;
-      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #333"><a href="${link}" style="color:#4ecca3;text-decoration:none">${date.replace(/-/g, ' ')}</a> <span style="color:#666">(${count})</span><button onclick="deleteSignupDate('${date}')" style="margin:0;padding:2px 8px;font-size:11px;background:#e94560">✕</button></div>`;
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #333"><a href="${link}" style="color:#4ecca3;text-decoration:none">${date.replace(/-/g, ' ')}</a> <span style="color:#666">(${count})</span><button onclick="navigator.clipboard.writeText('${link}');this.textContent='✓'" style="margin:0;padding:2px 8px;font-size:11px;background:#0f3460">📋 Copy</button><button onclick="deleteSignupDate('${date}')" style="margin:0;padding:2px 8px;font-size:11px;background:#e94560">✕</button></div>`;
     }).join('');
+  });
+}
+
+function showDuprLogs() {
+  const el = document.getElementById('duprLogsView');
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+  if (el.style.display === 'none') return;
+  el.innerHTML = '<div style="color:#aaa">Loading...</div>';
+  getDb().ref('sessions').once('value').then(sessSnap => {
+    const sessions = sessSnap.val() || {};
+    const promises = Object.keys(sessions).map(key =>
+      getDb().ref(key + '/archive').once('value').then(snap => ({ key, data: snap.val() }))
+    );
+    Promise.all(promises).then(results => {
+      let html = '';
+      results.forEach(({ key, data }) => {
+        if (!data) return;
+        Object.entries(data).forEach(([archKey, s]) => {
+          if (!s.duprLog || !s.duprLog.length) return;
+          html += `<div style="background:#16213e;padding:10px;border-radius:6px;margin-bottom:8px">`;
+          html += `<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-weight:600;color:#4ecca3;font-size:13px">${s.sessionDate || 'Session'} — ${new Date(s.sessionStart).toLocaleDateString()}</span>`;
+          html += `<button onclick="deleteDuprLog('${key}','${archKey}')" style="margin:0;padding:2px 8px;font-size:11px;background:#e94560">🗑️</button></div>`;
+          s.duprLog.forEach((m, i) => {
+            html += `<div style="font-size:11px;color:#ccc;padding:2px 0">Game ${i+1}: ${m.winners.join(' & ')} beat ${m.losers.join(' & ')} (${m.winScore}–${m.loseScore})</div>`;
+          });
+          html += `</div>`;
+        });
+      });
+      el.innerHTML = html || '<div style="color:#aaa">No DUPR match logs found.</div>';
+    });
+  });
+}
+
+function deleteDuprLog(sessionKey, archKey) {
+  if (!confirm('Delete this DUPR log?')) return;
+  getDb().ref(sessionKey + '/archive/' + archKey + '/duprLog').remove().then(() => showDuprLogs());
+}
+
+function showOrgDuprLogs() {
+  const el = document.getElementById('orgDuprLogsView');
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+  if (el.style.display === 'none') return;
+  el.innerHTML = '<div style="color:#aaa">Loading...</div>';
+  getDb().ref('sessions').once('value').then(sessSnap => {
+    const sessions = sessSnap.val() || {};
+    const promises = Object.keys(sessions).map(key =>
+      getDb().ref(key + '/archive').once('value').then(snap => ({ key, data: snap.val() }))
+    );
+    Promise.all(promises).then(results => {
+      let html = '';
+      results.forEach(({ key, data }) => {
+        if (!data) return;
+        Object.values(data).forEach(s => {
+          if (!s.duprLog || !s.duprLog.length) return;
+          html += `<div style="background:#16213e;padding:10px;border-radius:6px;margin-bottom:8px">`;
+          html += `<div style="font-weight:600;color:#4ecca3;font-size:13px">${s.sessionDate || 'Session'} — ${new Date(s.sessionStart).toLocaleDateString()}</div>`;
+          s.duprLog.forEach((m, i) => {
+            html += `<div style="font-size:11px;color:#ccc;padding:2px 0">Game ${i+1}: ${m.winners.join(' & ')} beat ${m.losers.join(' & ')} (${m.winScore}–${m.loseScore})</div>`;
+          });
+          html += `</div>`;
+        });
+      });
+      el.innerHTML = html || '<div style="color:#aaa">No DUPR match logs found.</div>';
+    });
   });
 }
 
@@ -659,6 +842,7 @@ function checkPasscode() {
     if (input === ADMIN_CODE) {
       document.getElementById('lockError').textContent = '';
       document.getElementById('adminPanel').style.display = 'block';
+      document.getElementById('adminPasscodes').innerHTML = '<div style="margin-bottom:12px;padding:10px;background:#0f3460;border-radius:8px;font-size:13px"><strong style="color:#eee">Current Passcodes:</strong><br>Admin: <span style="color:#4ecca3">' + ADMIN_CODE + '</span><br>Organizer: <span style="color:#4ecca3">' + ORGANIZER_CODE + '</span></div>';
       loadExistingSessions();
       return;
     }
@@ -666,7 +850,6 @@ function checkPasscode() {
       document.getElementById('lockError').textContent = '';
       document.getElementById('organizerPanel').style.display = 'block';
       loadOrganizerSignups();
-      loadOrgSessions();
       return;
     }
     const key = input.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -764,6 +947,27 @@ function logout() {
   location.reload();
 }
 
+const FORMAT_INFO = {
+  classic: '<strong>🏆 King of the Court</strong><br>Players seeded by rating across courts. Teams: #1+#4 vs #2+#3. Winners stay, losers drop. Bottom loser drops to the court below, top winner from below promotes up. 2 consecutive losses = extra drop. Goal: fight to Court 1 and stay there.',
+  dupr: '<strong>📊 DUPR Recordable</strong><br>Same as King of the Court but requires entering scores. Records all games with players and scores in a match log. At end of session, use the log to enter games on dupr.gg for official rating updates.',
+  roundrobin: '<strong>🔄 Round Robin</strong><br>Everyone plays against everyone. Teams are shuffled each round. Live standings track wins/losses/percentage. Best for 8-12 players. Fair — everyone plays the same number of games.',
+  balancedrr: '<strong>⚖️ Balanced Round Robin</strong><br>Same as Round Robin but teams are formed by rating (strongest + weakest paired together via snake draft). Creates more competitive, balanced matchups.',
+  random: '<strong>🎲 Random Mix</strong><br>Teams are completely shuffled randomly each round. No seeding, no strategy — just fun. Good for social play where you want to mix with everyone.',
+  ladder: '<strong>🪜 Ladder</strong><br>Players ranked by rating. Adjacent players on the ladder play each other. Win = move up, lose = move down. The ladder reorders after each round based on cumulative record.',
+  swiss: '<strong>🧩 Swiss</strong><br>Players with similar win/loss records are matched each round. After a few rounds, strong players face strong, weak face weak. Finds the best players without a full round robin. Good for larger groups.',
+  elimination: '<strong>💀 Double Elimination</strong><br>You need 2 losses to be eliminated. First loss sends you to the losers bracket. Second loss = out. Gives everyone a second chance. Works best with fixed partners.',
+  fixed: '<strong>🤝 Fixed Partners</strong><br>Same partners for the entire session. Teams rotate opponents each round. Good for practicing with a specific partner or running a team-based competition.'
+};
+
+function showFormatInfo() {
+  const el = document.getElementById('formatInfo');
+  const format = document.getElementById('gameFormat').value;
+  if (el.style.display === 'block' && el.dataset.format === format) { el.style.display = 'none'; return; }
+  el.innerHTML = FORMAT_INFO[format] || '';
+  el.style.display = 'block';
+  el.dataset.format = format;
+}
+
 function initApp() {
   getDb();
   db = firebase.database().ref(sessionKey + '/game');
@@ -786,7 +990,7 @@ function initApp() {
   });
   initDocInput();
   fetchSchedule();
-  renderPlayerList(dummyNames.slice(0, 8));
+  renderPlayerList(['']);
   if (sessionKey === 'pickle2026') {
     document.getElementById('scheduleSection').style.display = 'block';
   }
@@ -815,23 +1019,91 @@ function startGame(dupr) {
   const duprs = getPlayerDuprs();
   const courtLabels = getCourtNumbers();
   const numCourts = courtLabels.length;
-  const needed = numCourts * 4;
-  if (!numCourts) return alert('Enter court numbers (e.g. 3, 5, 7).');
-  if (names.length !== needed) return alert(`You need exactly ${needed} players for ${numCourts} courts. You entered ${names.length}.`);
-  state.players = names.map((name, i) => ({ name, seed: i + 1, consecLosses: 0, dupr: duprs[i] || 0 }));
+  const format = document.getElementById('gameFormat').value;
+  if (names.length < 4) return alert('Need at least 4 players.');
+  state.players = names.map((name, i) => ({ name, seed: i + 1, consecLosses: 0, dupr: duprs[i] || 0, wins: 0, losses: 0, byeCount: 0 }));
   state.courtLabels = courtLabels;
-  state.duprMode = !!dupr;
+  state.gameFormat = format;
+  state.duprMode = (format === 'dupr');
   state.startingDuprs = state.duprMode ? Object.fromEntries(names.map((name, i) => [name, duprs[i] || 0])) : null;
   state.round = 1;
   state.history = [];
   state.pendingResults = {};
+  state.bye = [];
+  state.matchups = null;
   state.sessionStart = new Date().toISOString();
-  state.sessionDate = document.getElementById('dateSelect').value || 'Custom Game';
+  state.sessionDate = document.getElementById('dateSelect') ? (document.getElementById('dateSelect').value || 'Custom Game') : 'Custom Game';
   state.isQuickGame = false;
+  if (format !== 'classic' && format !== 'dupr') {
+    state.matchups = generateMatchups(format);
+  } else if (names.length % 4 !== 0) {
+    // King of the Court with odd players — sit some out
+    const sitOut = names.length % 4;
+    const sorted = [...state.players].sort((a, b) => (a.byeCount || 0) - (b.byeCount || 0) || Math.random() - 0.5);
+    state.bye = sorted.slice(names.length - sitOut).map(p => p.name);
+    sorted.slice(names.length - sitOut).forEach(p => { p.byeCount = (p.byeCount || 0) + 1; });
+    // Reorder players: active first, bye excluded
+    const activeNames = sorted.slice(0, names.length - sitOut);
+    state.players = [...activeNames, ...sorted.slice(names.length - sitOut)];
+  }
   document.getElementById('setup').style.display = 'none';
   document.getElementById('game').style.display = 'block';
   saveState();
   render();
+}
+
+function generateMatchups(format) {
+  const players = state.players;
+  const n = players.length;
+  const numCourts = state.courtLabels.length;
+  const maxOnCourt = numCourts * 4;
+  let active, bye = [];
+
+  // Fair bye rotation: whoever has sat out least sits out next
+  // Completely independent of game results
+  const playable = Math.min(n, maxOnCourt);
+  const needed = playable - (playable % 4); // round down to multiple of 4
+  const sitOut = n - needed;
+
+  if (sitOut > 0) {
+    const sorted = [...players].sort((a, b) => (a.byeCount || 0) - (b.byeCount || 0) || Math.random() - 0.5);
+    active = sorted.slice(0, needed);
+    bye = sorted.slice(needed);
+    bye.forEach(p => { p.byeCount = (p.byeCount || 0) + 1; });
+  } else {
+    active = [...players];
+  }
+
+  state.bye = bye.map(p => p.name);
+
+  // Generate court assignments based on format
+  const courts = [];
+  if (format === 'random') {
+    const shuffled = [...active].sort(() => Math.random() - 0.5);
+    for (let i = 0; i < shuffled.length; i += 4) courts.push(shuffled.slice(i, i + 4));
+  } else if (format === 'balancedrr') {
+    const sorted = [...active].sort((a, b) => (b.dupr || 0) - (a.dupr || 0));
+    for (let i = 0; i < sorted.length; i += 4) courts.push(sorted.slice(i, i + 4));
+  } else if (format === 'swiss') {
+    const sorted = [...active].sort((a, b) => (b.wins - b.losses) - (a.wins - a.losses) || Math.random() - 0.5);
+    for (let i = 0; i < sorted.length; i += 4) courts.push(sorted.slice(i, i + 4));
+  } else if (format === 'ladder') {
+    const sorted = [...active].sort((a, b) => (b.wins - b.losses) - (a.wins - a.losses) || (b.dupr || 0) - (a.dupr || 0));
+    for (let i = 0; i < sorted.length; i += 4) courts.push(sorted.slice(i, i + 4));
+  } else if (format === 'fixed') {
+    for (let i = 0; i < active.length; i += 4) courts.push(active.slice(i, i + 4));
+  } else if (format === 'roundrobin') {
+    const shuffled = [...active].sort(() => Math.random() - 0.5);
+    for (let i = 0; i < shuffled.length; i += 4) courts.push(shuffled.slice(i, i + 4));
+  } else if (format === 'elimination') {
+    const sorted = [...active].sort((a, b) => (b.dupr || 0) - (a.dupr || 0));
+    for (let i = 0; i < sorted.length; i += 4) courts.push(sorted.slice(i, i + 4));
+  } else {
+    const shuffled = [...active].sort(() => Math.random() - 0.5);
+    for (let i = 0; i < shuffled.length; i += 4) courts.push(shuffled.slice(i, i + 4));
+  }
+
+  return courts;
 }
 
 function resetGame() {
@@ -869,7 +1141,8 @@ function endSession() {
       sessionEnd: new Date().toISOString(),
       players: snap.players,
       history: snap.history || [],
-      rounds: snap.round - 1
+      rounds: snap.round - 1,
+      duprLog: snap.duprLog || null
     });
   }
   promise.then(() => {
@@ -883,9 +1156,11 @@ function endSession() {
 }
 
 function getCourts() {
+  if (state.matchups && state.matchups.length) return state.matchups;
+  const active = state.bye && state.bye.length ? state.players.filter(p => !state.bye.includes(p.name)) : state.players;
   const courts = [];
-  for (let i = 0; i < state.players.length; i += 4) {
-    courts.push(state.players.slice(i, i + 4));
+  for (let i = 0; i < active.length; i += 4) {
+    courts.push(active.slice(i, i + 4));
   }
   return courts;
 }
@@ -1095,6 +1370,22 @@ function render() {
   });
   document.getElementById('courts').innerHTML = html;
 
+  // Show bye players
+  if (state.bye && state.bye.length) {
+    document.getElementById('courts').innerHTML += `<div style="text-align:center;padding:8px;margin-top:8px;background:#0f3460;border-radius:8px;font-size:13px;color:#aaa">⏸ Sitting out: ${state.bye.join(', ')}</div>`;
+  }
+
+  // Show standings for non-classic formats
+  if (state.gameFormat && state.gameFormat !== 'classic' && state.gameFormat !== 'dupr' && state.players.some(p => p.wins || p.losses)) {
+    const sorted = [...state.players].sort((a, b) => (b.wins - b.losses) - (a.wins - a.losses) || b.wins - a.wins);
+    let standingsHtml = '<div style="background:#0f3460;border-radius:8px;padding:12px;margin-top:12px"><h3 style="color:#e94560;margin:0 0 8px;font-size:14px">📊 Standings</h3>';
+    sorted.forEach((p, i) => {
+      standingsHtml += `<div style="display:flex;justify-content:space-between;padding:3px 8px;font-size:13px"><span>${i+1}. ${p.name}</span><span style="color:#4ecca3">${p.wins}W-${p.losses}L</span></div>`;
+    });
+    standingsHtml += '</div>';
+    document.getElementById('courts').innerHTML += standingsHtml;
+  }
+
   // Restore unsaved score inputs
   Object.entries(savedScores).forEach(([id, val]) => {
     const el = document.getElementById(id);
@@ -1112,20 +1403,14 @@ function render() {
 
 function renderDuprSummary() {
   const el = document.getElementById('duprSummary');
-  if (!el || !state.startingDuprs || !state.players.some(p => p.dupr > 0)) { if (el) el.innerHTML = ''; return; }
-  const seen = new Set();
-  const rows = state.players.filter(p => p.dupr > 0).map(p => ({ name: p.name, start: state.startingDuprs[p.name] || p.dupr, now: p.dupr })).filter(r => r.start > 0 && !seen.has(r.name) && seen.add(r.name));
-  if (!rows.length) { el.innerHTML = ''; return; }
-  rows.sort((a, b) => b.now - a.now);
+  if (!el || !state.duprMode) { if (el) el.innerHTML = ''; return; }
+  // Build match log from history for DUPR submission
+  if (!state.duprLog || !state.duprLog.length) { el.innerHTML = ''; return; }
   let html = '<div style="background:#0f3460;border-radius:8px;padding:12px;margin-top:16px">';
-  html += '<h2 style="color:#e94560;margin:0 0 8px;font-size:16px">📊 DUPR Tracker</h2>';
-  rows.forEach(r => {
-    const diff = r.now - r.start;
-    const sign = diff >= 0 ? '+' : '';
-    const color = diff > 0 ? '#4ecca3' : diff < 0 ? '#e94560' : '#aaa';
-    html += `<div style="display:flex;justify-content:space-between;padding:4px 8px;font-size:13px">`;
-    html += `<span>${r.name}</span>`;
-    html += `<span><span style="color:#aaa">${r.start.toFixed(3)}</span> → <span style="color:#4ecca3;font-weight:600">${r.now.toFixed(3)}</span> <span style="color:${color};font-size:11px">(${sign}${diff.toFixed(3)})</span></span>`;
+  html += '<h2 style="color:#e94560;margin:0 0 8px;font-size:14px">📊 DUPR Match Log (enter these on dupr.gg)</h2>';
+  state.duprLog.forEach((m, i) => {
+    html += `<div style="padding:4px 8px;font-size:12px;border-bottom:1px solid #1a1a2e;color:#ccc">`;
+    html += `Game ${i+1}: <strong style="color:#4ecca3">${m.winners.join(' & ')}</strong> beat <strong>${m.losers.join(' & ')}</strong> (${m.winScore}–${m.loseScore})`;
     html += `</div>`;
   });
   html += '</div>';
@@ -1178,82 +1463,126 @@ function undoRound() {
 
 function resolveRound() {
   // Save snapshot for undo
-  state.prevState = JSON.stringify({ players: state.players, round: state.round, history: state.history, pendingResults: state.pendingResults });
-  const numCourts = state.players.length / 4;
-  let roundLog = `<strong>Round ${state.round}:</strong><br>`;
-  const moves = [];
+  state.prevState = JSON.stringify({ players: state.players, round: state.round, history: state.history, pendingResults: state.pendingResults, matchups: state.matchups, bye: state.bye });
 
+  const format = state.gameFormat || 'classic';
+  const courts = getCourts();
+  const numCourts = courts.length;
+  let roundLog = `<strong>Round ${state.round}:</strong><br>`;
+
+  // Record wins/losses for all formats
   for (let ci = 0; ci < numCourts; ci++) {
     const r = state.pendingResults[ci];
     const w = (typeof r === 'object') ? r.winner : r;
-    const base = ci * 4;
-    const winners = w === 'A' ? [0, 3] : [1, 2];
-    const losers = w === 'A' ? [1, 2] : [0, 3];
-    winners.forEach(i => { state.players[base + i].consecLosses = 0; });
-    losers.forEach(i => { state.players[base + i].consecLosses += 1; });
-    const wNames = winners.map(i => state.players[base + i].name).join(' & ');
-    const lNames = losers.map(i => state.players[base + i].name).join(' & ');
+    const court = courts[ci];
+    const winIdxs = w === 'A' ? [0, 3] : [1, 2];
+    const loseIdxs = w === 'A' ? [1, 2] : [0, 3];
+    const wNames = winIdxs.map(i => court[i].name).join(' & ');
+    const lNames = loseIdxs.map(i => court[i].name).join(' & ');
     const scoreStr = (typeof r === 'object' && r.scoreA !== undefined) ? ` (${r.scoreA}–${r.scoreB})` : '';
     const cl = (state.courtLabels && state.courtLabels[ci]) || ci + 1;
     roundLog += `Court ${cl}: 🏆 ${wNames} beat ${lNames}${scoreStr}<br>`;
+    // Update win/loss records
+    winIdxs.forEach(i => { const p = state.players.find(x => x.name === court[i].name); if (p) p.wins = (p.wins || 0) + 1; });
+    loseIdxs.forEach(i => { const p = state.players.find(x => x.name === court[i].name); if (p) p.losses = (p.losses || 0) + 1; });
   }
 
-  // DUPR simulation
-  let duprLog = [];
-  if (state.duprMode && state.players.some(p => p.dupr > 0)) {
+  if (format === 'classic' || format === 'dupr') {
+    // Classic king-of-the-court logic
+    for (let ci = 0; ci < numCourts; ci++) {
+      const r = state.pendingResults[ci];
+      const w = (typeof r === 'object') ? r.winner : r;
+      const base = ci * 4;
+      const winners = w === 'A' ? [0, 3] : [1, 2];
+      const losers = w === 'A' ? [1, 2] : [0, 3];
+      winners.forEach(i => { state.players[base + i].consecLosses = 0; });
+      losers.forEach(i => { state.players[base + i].consecLosses += 1; });
+    }
+
+    // DUPR match log
+    if (state.duprMode) {
+      if (!state.duprLog) state.duprLog = [];
+      for (let ci = 0; ci < numCourts; ci++) {
+        const r = state.pendingResults[ci];
+        const w = (typeof r === 'object') ? r.winner : r;
+        const base = ci * 4;
+        const winIdxs = w === 'A' ? [0, 3] : [1, 2];
+        const loseIdxs = w === 'A' ? [1, 2] : [0, 3];
+        const wScore = (typeof r === 'object') ? (w === 'A' ? r.scoreA : r.scoreB) : null;
+        const lScore = (typeof r === 'object') ? (w === 'A' ? r.scoreB : r.scoreA) : null;
+        state.duprLog.push({
+          winners: winIdxs.map(i => state.players[base + i].name),
+          losers: loseIdxs.map(i => state.players[base + i].name),
+          winScore: wScore || 11,
+          loseScore: lScore || 0
+        });
+      }
+    }
+
+    const newCourts = [];
     for (let ci = 0; ci < numCourts; ci++) {
       const r = state.pendingResults[ci];
       const w = (typeof r === 'object') ? r.winner : r;
       const base = ci * 4;
       const winIdxs = w === 'A' ? [0, 3] : [1, 2];
       const loseIdxs = w === 'A' ? [1, 2] : [0, 3];
-      const wScore = (typeof r === 'object' && r.scoreA !== undefined) ? (w === 'A' ? r.scoreA : r.scoreB) : null;
-      const lScore = (typeof r === 'object' && r.scoreA !== undefined) ? (w === 'A' ? r.scoreB : r.scoreA) : null;
-      duprLog = duprLog.concat(updateSimDupr(state.players, base, winIdxs, loseIdxs, wScore, lScore));
+      const winPlayers = winIdxs.map(i => state.players[base + i]);
+      const losePlayers = loseIdxs.map(i => state.players[base + i]);
+      newCourts.push([winPlayers[0], winPlayers[1], losePlayers[0], losePlayers[1]]);
     }
-  }
 
-  const newCourts = [];
-  for (let ci = 0; ci < numCourts; ci++) {
-    const r = state.pendingResults[ci];
-    const w = (typeof r === 'object') ? r.winner : r;
-    const base = ci * 4;
-    const winIdxs = w === 'A' ? [0, 3] : [1, 2];
-    const loseIdxs = w === 'A' ? [1, 2] : [0, 3];
-    const winPlayers = winIdxs.map(i => state.players[base + i]);
-    const losePlayers = loseIdxs.map(i => state.players[base + i]);
-    newCourts.push([winPlayers[0], winPlayers[1], losePlayers[0], losePlayers[1]]);
-  }
-
-  for (let ci = 0; ci < numCourts - 1; ci++) {
-    const dropper = newCourts[ci][3];
-    const promoter = newCourts[ci + 1][0];
-    moves.push(`⬇️ ${dropper.name} drops from Court ${ci+1} → Court ${ci+2} (Seed 1)`);
-    moves.push(`⬆️ ${promoter.name} promotes from Court ${ci+2} → Court ${ci+1} (Seed 4)`);
-    newCourts[ci + 1][0] = dropper;
-    dropper.consecLosses = 0;
-    newCourts[ci][3] = promoter;
-    promoter.consecLosses = 0;
-  }
-
-  for (let ci = 0; ci < numCourts - 1; ci++) {
-    const seed3 = newCourts[ci][2];
-    if (seed3.consecLosses >= 2) {
-      const promoter2 = newCourts[ci + 1][1];
-      moves.push(`⬇️ ${seed3.name} (2 consecutive losses) drops from Court ${ci+1} → Court ${ci+2} (Seed 2)`);
-      moves.push(`⬆️ ${promoter2.name} promotes from Court ${ci+2} → Court ${ci+1} (Seed 3)`);
-      newCourts[ci + 1][1] = seed3;
-      seed3.consecLosses = 0;
-      newCourts[ci][2] = promoter2;
-      promoter2.consecLosses = 0;
+    for (let ci = 0; ci < numCourts - 1; ci++) {
+      const dropper = newCourts[ci][3];
+      const promoter = newCourts[ci + 1][0];
+      newCourts[ci + 1][0] = dropper;
+      dropper.consecLosses = 0;
+      newCourts[ci][3] = promoter;
+      promoter.consecLosses = 0;
     }
+
+    for (let ci = 0; ci < numCourts - 1; ci++) {
+      const seed3 = newCourts[ci][2];
+      if (seed3.consecLosses >= 2) {
+        const promoter2 = newCourts[ci + 1][1];
+        newCourts[ci + 1][1] = seed3;
+        seed3.consecLosses = 0;
+        newCourts[ci][2] = promoter2;
+        promoter2.consecLosses = 0;
+      }
+    }
+
+    state.players = newCourts.flat();
+    // Rotate bye players for next round
+    const totalPlayers = state.players.length + (state.bye ? state.bye.length : 0);
+    if (totalPlayers % 4 !== 0) {
+      const allPlayers = [...state.players];
+      // Add back bye players from this round
+      if (state.bye && state.bye.length) {
+        state.bye.forEach(name => {
+          const existing = allPlayers.find(p => p.name === name);
+          if (!existing) {
+            const orig = state.players.find(p => p.name === name) || { name, seed: 0, consecLosses: 0, dupr: 0, wins: 0, losses: 0, byeCount: 0 };
+            allPlayers.push(orig);
+          }
+        });
+      }
+      const sitOut = allPlayers.length % 4;
+      if (sitOut > 0) {
+        const sorted = [...allPlayers].sort((a, b) => (a.byeCount || 0) - (b.byeCount || 0) || Math.random() - 0.5);
+        state.bye = sorted.slice(sorted.length - sitOut).map(p => p.name);
+        sorted.slice(sorted.length - sitOut).forEach(p => { p.byeCount = (p.byeCount || 0) + 1; });
+        state.players = sorted;
+      } else {
+        state.bye = [];
+        state.players = allPlayers;
+      }
+    }
+  } else {
+    // Non-classic formats: regenerate matchups for next round
+    state.matchups = generateMatchups(format);
   }
 
-  if (moves.length) roundLog += `<br><em>Players rotated between courts.</em>`;
-  else roundLog += `<br><em>No court changes this round.</em>`;
-  if (duprLog.length) roundLog += `<br><strong>📈 DUPR Sim:</strong><br>` + duprLog.map(d => `&nbsp;&nbsp;${d.name}: ${d.change}`).join('<br>');
-
-  state.players = newCourts.flat();
+  if (state.bye && state.bye.length) roundLog += `<br><em>⏸ Bye: ${state.bye.join(', ')}</em>`;
   state.history.push(roundLog);
   state.round++;
   state.pendingResults = {};
@@ -1285,9 +1614,55 @@ function renderPlayerList(names, duprs) {
   names.forEach((name, i) => {
     const row = document.createElement('div');
     row.className = 'player-row';
-    row.innerHTML = `<span class="seed-label">${i+1}.</span><button class="move-btn" onclick="movePlayer(${i},-1)">▲</button><button class="move-btn" onclick="movePlayer(${i},1)">▼</button><input class="name-input" value="${name}"><input class="dupr-input" value="${duprs[i] || ''}" placeholder="DUPR"><button class="move-btn" onclick="jumpPlayer(${i})" title="Move to position">#</button><button class="remove-btn" onclick="removePlayer(${i})">✕</button>`;
+    row.style.position = 'relative';
+    row.innerHTML = `<span class="seed-label">${name ? i+1 : ''}.</span><button class="move-btn" onclick="movePlayer(${i},-1)">▲</button><button class="move-btn" onclick="movePlayer(${i},1)">▼</button><input class="name-input" value="${name || ''}" oninput="playerNameSearch(this,${i})" placeholder="Type name..."><input class="dupr-input" value="${duprs[i] || ''}" placeholder="DUPR"><button class="move-btn" onclick="jumpPlayer(${i})" title="Move to position">#</button><button class="remove-btn" onclick="removePlayer(${i})">✕</button><div class="player-suggestions" style="display:none;position:absolute;z-index:10;background:#0f3460;border:1px solid #333;border-radius:6px;max-height:120px;overflow-y:auto;font-size:12px;width:200px;top:36px;left:60px"></div>`;
     list.appendChild(row);
   });
+}
+
+let playerSearchTimer = null;
+function playerNameSearch(input, idx) {
+  const val = input.value.trim();
+  const box = input.closest('.player-row').querySelector('.player-suggestions');
+  if (val.length < 2) { box.style.display = 'none'; return; }
+  clearTimeout(playerSearchTimer);
+  playerSearchTimer = setTimeout(async () => {
+    try {
+      const res = await fetch(DUPR_PROXY + '/search?name=' + encodeURIComponent(val));
+      const data = await res.json();
+      if (!data.hits || !data.hits.length) { box.style.display = 'none'; return; }
+      box.style.display = 'block';
+      box.innerHTML = data.hits.map(h =>
+        `<div onclick="pickPlayerName(${idx},'${h.name.replace(/'/g,"\\'")}',${h.dupr})" style="padding:6px 8px;cursor:pointer;border-bottom:1px solid #1a1a2e" onmouseover="this.style.background='#16213e'" onmouseout="this.style.background=''">` +
+        `${h.name} <span style="color:#4ecca3">${h.dupr ? h.dupr.toFixed(2) : ''}</span></div>`
+      ).join('');
+    } catch (e) { box.style.display = 'none'; }
+  }, 400);
+}
+function autoAdjustCourts(playerCount) {
+  const courts = Math.max(1, Math.floor(playerCount / 4));
+  document.getElementById('courtNumbers').value = Array.from({length: courts}, (_, i) => i + 1).join(', ');
+}
+
+function pickPlayerName(idx, name, dupr) {
+  const rows = document.querySelectorAll('#playerList .player-row');
+  const names = [], duprs = [];
+  rows.forEach(r => {
+    const n = r.querySelector('.name-input').value.trim();
+    const d = parseFloat(r.querySelector('.dupr-input').value) || 0;
+    if (n) { names.push(n); duprs.push(d); }
+  });
+  // Replace the edited row
+  if (idx < names.length) { names[idx] = name; duprs[idx] = dupr; }
+  else { names.push(name); duprs.push(dupr); }
+  const combined = names.map((n, i) => ({ n, d: duprs[i] }));
+  combined.sort((a, b) => b.d - a.d);
+  combined.push({ n: '', d: 0 });
+  renderPlayerList(combined.map(p => p.n), combined.map(p => p.d));
+  autoAdjustCourts(combined.length - 1);
+  const inputs = document.querySelectorAll('#playerList .player-row .name-input');
+  const empty = [...inputs].find(i => !i.value);
+  if (empty) empty.focus();
 }
 
 function movePlayer(idx, dir) {
@@ -1330,6 +1705,154 @@ function addPlayerRow() {
   renderPlayerList(names, duprs);
   const inputs = document.querySelectorAll('#playerList .player-row .name-input');
   inputs[inputs.length - 1].focus();
+}
+
+// Session scan functions
+let sessionScanStream = null;
+function startSessionScan() {
+  const video = document.getElementById('sessionScanVideo');
+  document.getElementById('sessionScanArea').style.display = 'block';
+  document.getElementById('sessionScanStatus').textContent = '📷 Point camera at card...';
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1280 } } })
+    .then(stream => { sessionScanStream = stream; video.srcObject = stream; })
+    .catch(() => { document.getElementById('sessionScanStatus').textContent = '❌ Camera access denied.'; });
+}
+function stopSessionScan() {
+  if (sessionScanStream) { sessionScanStream.getTracks().forEach(t => t.stop()); sessionScanStream = null; }
+  document.getElementById('sessionScanArea').style.display = 'none';
+  document.getElementById('sessionScanStatus').textContent = '';
+}
+async function sessionCaptureCard() {
+  const video = document.getElementById('sessionScanVideo');
+  const canvas = document.getElementById('sessionScanCanvas');
+  canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+  stopSessionScan();
+  document.getElementById('sessionScanStatus').textContent = '🔄 Reading...';
+  try {
+    const { data } = await Tesseract.recognize(canvas, 'eng');
+    sessionProcessOCR(data);
+  } catch (e) { document.getElementById('sessionScanStatus').textContent = '❌ ' + e.message; }
+}
+async function sessionUploadCard(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  document.getElementById('sessionScanStatus').textContent = '🔄 Reading...';
+  try {
+    const { data } = await Tesseract.recognize(file, 'eng');
+    sessionProcessOCR(data);
+  } catch (e) { document.getElementById('sessionScanStatus').textContent = '❌ ' + e.message; }
+  event.target.value = '';
+}
+function sessionProcessOCR(data) {
+  const parsed = parseCard(data.text);
+  if (parsed.name) {
+    const names = getPlayerNames(), duprs = getPlayerDuprs();
+    names.push(parsed.name);
+    duprs.push(parseFloat(parsed.rating) || 0);
+    renderPlayerList(names, duprs);
+    document.getElementById('sessionScanStatus').innerHTML = `✅ Added <strong>${parsed.name}</strong> (${parsed.rating || 'NR'})`;
+    document.getElementById('sessionScanStatus').style.color = '#4ecca3';
+  } else {
+    document.getElementById('sessionScanStatus').textContent = '❌ Couldn\'t read card.';
+    document.getElementById('sessionScanStatus').style.color = '#ff6b6b';
+  }
+}
+
+async function scanSignupSheet(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const status = document.getElementById('sessionScanStatus');
+  status.textContent = '🔄 Reading signup sheet...';
+  status.style.color = '#aaa';
+  try {
+    const { data } = await Tesseract.recognize(file, 'eng');
+    const lines = data.text.split('\n').map(l => l.trim()).filter(l => l.length > 2 && /[a-zA-Z]/.test(l));
+    // Clean up: remove numbers, bullets, common OCR noise
+    const names = lines.map(l => l.replace(/^[\d.\-)\]]+\s*/, '').replace(/[^a-zA-Z\s'-]/g, '').trim())
+      .filter(n => {
+        const words = n.split(/\s+/);
+        return words.length >= 2 && words.length <= 3 && words.every(w => w.length >= 2) && n.length >= 5 && n.length <= 30;
+      });
+    if (!names.length) {
+      status.textContent = '❌ No names detected. Write in CAPS, one per line, good lighting.';
+      status.style.color = '#ff6b6b';
+      event.target.value = '';
+      return;
+    }
+    status.textContent = `🔄 Found ${names.length} names. Fetching DUPR ratings...`;
+    const playerNames = getPlayerNames(), playerDuprs = getPlayerDuprs();
+    for (let i = 0; i < names.length; i++) {
+      status.textContent = `🔄 Looking up ${names[i]}... (${i+1}/${names.length})`;
+      let dupr = 0;
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 6000);
+        const res = await fetch(DUPR_PROXY + '/lookup?name=' + encodeURIComponent(names[i]), { signal: controller.signal });
+        clearTimeout(timeout);
+        const d = await res.json();
+        dupr = d.dupr || 0;
+      } catch (e) {}
+      playerNames.push(names[i]);
+      playerDuprs.push(dupr);
+    }
+    renderPlayerList(playerNames, playerDuprs);
+    const found = playerDuprs.slice(-names.length).filter(d => d > 0).length;
+    status.innerHTML = `✅ Added ${names.length} players (${found} with DUPR ratings)`;
+    status.style.color = '#4ecca3';
+  } catch (e) {
+    status.textContent = '❌ OCR error: ' + e.message;
+    status.style.color = '#ff6b6b';
+  }
+  event.target.value = '';
+}
+
+let sessionSearchTimer = null;
+function onSessionDuprSearch() {
+  const val = document.getElementById('sessionDuprSearch').value.trim();
+  const box = document.getElementById('sessionDuprSuggestions');
+  if (val.length < 2) { box.style.display = 'none'; return; }
+  clearTimeout(sessionSearchTimer);
+  sessionSearchTimer = setTimeout(async () => {
+    try {
+      const res = await fetch(DUPR_PROXY + '/search?name=' + encodeURIComponent(val));
+      const data = await res.json();
+      if (!data.hits || !data.hits.length) { box.style.display = 'none'; return; }
+      box.style.display = 'block';
+      box.innerHTML = data.hits.map(h =>
+        `<div onclick="addFromDupr('${h.name.replace(/'/g,"\\'")}',${h.dupr})" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #1a1a2e;font-size:13px" onmouseover="this.style.background='#16213e'" onmouseout="this.style.background=''">` +
+        `<span style="color:#eee">${h.name}</span> <span style="color:#4ecca3;font-size:12px">${h.dupr ? h.dupr.toFixed(2) : 'NR'}</span></div>`
+      ).join('');
+    } catch (e) { box.style.display = 'none'; }
+  }, 400);
+}
+function addFromDupr(name, dupr) {
+  const names = getPlayerNames(), duprs = getPlayerDuprs();
+  names.push(name);
+  duprs.push(dupr);
+  // Auto-sort by rating descending
+  const combined = names.map((n, i) => ({ n, d: duprs[i] }));
+  combined.sort((a, b) => b.d - a.d);
+  combined.push({ n: '', d: 0 });
+  renderPlayerList(combined.map(p => p.n), combined.map(p => p.d));
+  autoAdjustCourts(combined.length - 1);
+  document.getElementById('sessionDuprSearch').value = '';
+  document.getElementById('sessionDuprSuggestions').style.display = 'none';
+  const inputs = document.querySelectorAll('#playerList .player-row .name-input');
+  const empty = [...inputs].find(i => !i.value);
+  if (empty) empty.focus();
+}
+
+function addTypedPlayer() {
+  const input = document.getElementById('sessionDuprSearch');
+  const name = input.value.trim();
+  if (!name) return;
+  const names = getPlayerNames(), duprs = getPlayerDuprs();
+  names.push(name);
+  duprs.push(0);
+  renderPlayerList(names, duprs);
+  input.value = '';
+  document.getElementById('sessionDuprSuggestions').style.display = 'none';
 }
 
 function sortByDupr() {
@@ -1740,11 +2263,11 @@ function loadFromSignups() {
   getDb().ref('signups').once('value').then(snap => {
     const data = snap.val();
     if (!data) { alert('No signup sheets found.'); return; }
-    const active = Object.entries(data).filter(([k, v]) => v.active && v.players);
-    if (!active.length) { alert('No signup sheets with players found.'); return; }
+    const active = Object.entries(data).filter(([k, v]) => v.active);
+    if (!active.length) { alert('No active signup sheets found.'); return; }
     let html = '<div style="background:#16213e;padding:16px;border-radius:8px;margin-bottom:12px"><label style="font-weight:600;color:#eee">Select a signup sheet:</label>';
     active.forEach(([date, v]) => {
-      const count = Object.keys(v.players).length;
+      const count = v.players ? Object.keys(v.players).length : 0;
       html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px;margin:4px 0;background:#0f3460;border-radius:6px;cursor:pointer" onclick="applySignupSheet('${date}')">`;
       html += `<span style="color:#4ecca3;font-weight:600">${date.replace(/-/g, ' ')}</span>`;
       html += `<span style="color:#aaa">${count} players</span></div>`;
@@ -1762,12 +2285,11 @@ function loadFromSignups() {
 function applySignupSheet(date) {
   getDb().ref('signups/' + date + '/players').once('value', snap => {
     const data = snap.val();
-    if (!data) return;
-    const entries = Object.values(data).sort((a, b) => a.ts - b.ts);
+    const entries = data ? Object.values(data).sort((a, b) => a.ts - b.ts) : [];
     const names = entries.map(e => e.name);
     const duprs = entries.map(e => e.dupr || e.clubRating || 0);
     renderPlayerList(names, duprs);
-    const courts = Math.floor(names.length / 4);
+    const courts = Math.max(1, Math.floor(names.length / 4));
     document.getElementById('courtNumbers').value = Array.from({length: courts}, (_, i) => i + 1).join(', ');
     const picker = document.getElementById('signupSheetPicker');
     if (picker) picker.remove();

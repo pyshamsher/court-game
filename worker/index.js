@@ -2,6 +2,7 @@
 const ALLOWED_ORIGINS = [
   'https://pickleball-tracker.surge.sh',
   'https://pickleball-tracker-dev.surge.sh',
+  'https://pickleplay.pages.dev',
   'http://localhost',
   'http://127.0.0.1'
 ];
@@ -15,6 +16,11 @@ function corsHeaders(origin) {
     'Access-Control-Max-Age': '86400',
   };
 }
+
+// Players DUPR search can't find — manually maintained
+const KNOWN_PLAYERS = [
+  { name: 'Shamsher Mann', dupr: 4.123, location: 'Edmonton, AB' },
+];
 
 function jsonResp(data, origin, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -100,6 +106,10 @@ export default {
     if (url.pathname === '/lookup') {
       const name = url.searchParams.get('name');
       if (!name) return jsonResp({ error: 'name param required' }, origin, 400);
+      // Check known players first
+      const normName = name.toLowerCase().replace(/[^a-z]/g, '');
+      const known = KNOWN_PLAYERS.find(kp => kp.name.toLowerCase().replace(/[^a-z]/g, '') === normName);
+      if (known) return jsonResp(known, origin);
       if (!env.DUPR_EMAIL || !env.DUPR_PASSWORD) return jsonResp({ error: 'DUPR credentials not configured' }, origin, 500);
       const loginData = await duprLoginFull(env);
       if (!loginData) return jsonResp({ error: 'DUPR login failed' }, origin, 500);
@@ -113,8 +123,22 @@ export default {
       const name = url.searchParams.get('name');
       if (!name || name.length < 2) return jsonResp({ hits: [] }, origin);
       if (!env.DUPR_EMAIL || !env.DUPR_PASSWORD) return jsonResp({ error: 'DUPR credentials not configured' }, origin, 500);
-      const token = await duprLogin(env);
-      if (!token) return jsonResp({ error: 'DUPR login failed' }, origin, 500);
+      const loginData = await duprLoginFull(env);
+      if (!loginData) return jsonResp({ error: 'DUPR login failed' }, origin, 500);
+      const token = loginData.result.accessToken;
+
+      // Check self-match
+      let selfHit = null;
+      const u = loginData.result.user;
+      if (u) {
+        const selfName = u.fullName || ((u.firstName || '') + ' ' + (u.lastName || '')).trim();
+        const norm = s => s.toLowerCase().replace(/[^a-z]/g, '');
+        if (selfName && (norm(selfName).includes(norm(name)) || norm(name).includes(norm(selfName)))) {
+          const rating = parseFloat(u.ratings?.doubles) || parseFloat(u.ratings?.singles) || 0;
+          if (rating > 0) selfHit = { name: selfName, dupr: rating, location: '' };
+        }
+      }
+
       const doSearch = async (q) => {
         const r = await fetch('https://api.dupr.gg/player/v1.0/search', {
           method: 'POST',
@@ -133,7 +157,19 @@ export default {
         const seen = new Set(hits.map(h => h.fullName));
         lastHits.forEach(h => { if (!seen.has(h.fullName)) hits.push(h); });
       }
-      return jsonResp({ hits: hits.map(h => ({ name: h.fullName, dupr: parseFloat(h.ratings?.doubles) || parseFloat(h.ratings?.singles) || 0, location: h.location?.display || '' })) }, origin);
+      let results = hits.map(h => ({ name: h.fullName, dupr: parseFloat(h.ratings?.doubles) || parseFloat(h.ratings?.singles) || 0, location: h.location?.display || '' }));
+      // Prepend self if not already in results
+      if (selfHit && !results.some(r => r.name.toLowerCase() === selfHit.name.toLowerCase())) {
+        results.unshift(selfHit);
+      }
+      // Add known players that match
+      const normQ = name.toLowerCase();
+      KNOWN_PLAYERS.forEach(kp => {
+        if (kp.name.toLowerCase().includes(normQ) || normQ.includes(kp.name.toLowerCase().split(' ').pop())) {
+          if (!results.some(r => r.name.toLowerCase() === kp.name.toLowerCase())) results.unshift(kp);
+        }
+      });
+      return jsonResp({ hits: results }, origin);
     }
 
     // Default: proxy to DUPR API
