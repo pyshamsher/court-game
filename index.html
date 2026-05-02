@@ -154,7 +154,37 @@
 <div id="app">
 <div class="sync-status" id="syncStatus">🔄 Connecting to server...</div>
 
-<div id="setup">
+<div id="roomSelect" style="display:none;max-width:500px;margin:0 auto">
+  <div style="background:#16213e;padding:20px;border-radius:12px;text-align:center">
+    <h2 style="color:#4ecca3;margin-bottom:16px">Start or Join a Game</h2>
+    <div id="activeGames" style="margin-bottom:16px"></div>
+    <div style="border-top:1px solid #333;padding-top:16px">
+      <label style="font-size:13px;color:#aaa;display:block;margin-bottom:6px">Or start a new game:</label>
+      <select id="roomSignupSheet" style="width:100%;padding:10px;border-radius:8px;border:none;background:#0f3460;color:#eee;font-size:14px;margin-bottom:8px">
+        <option value="">-- Select signup sheet --</option>
+      </select>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+        <select id="roomFormat" style="flex:1;padding:10px;border-radius:8px;border:none;background:#0f3460;color:#eee;font-size:14px">
+          <option value="classic">🏆 King of the Court</option>
+          <option value="dupr">📊 DUPR Recordable</option>
+          <option value="roundrobin">🔄 Round Robin</option>
+          <option value="balancedrr">⚖️ Balanced Round Robin</option>
+          <option value="random">🎲 Random Mix</option>
+          <option value="ladder">🪜 Ladder</option>
+          <option value="swiss">🧩 Swiss</option>
+          <option value="elimination">💀 Double Elimination</option>
+          <option value="fixed">🤝 Fixed Partners</option>
+        </select>
+        <button onclick="showRoomFormatInfo()" style="margin:0;padding:10px 12px;background:#0f3460;font-size:13px">ℹ️</button>
+      </div>
+      <div id="roomFormatInfo" style="display:none;background:#0f3460;padding:12px;border-radius:8px;margin-bottom:8px;font-size:12px;color:#ccc;line-height:1.6;text-align:left"></div>
+      <button onclick="startNewRoom()" style="width:100%;padding:10px;background:#4ecca3;color:#1a1a2e;font-weight:700">▶ Start Game</button>
+    </div>
+    <button onclick="logout()" style="background:#0f3460;margin-top:12px">🚪 Logout</button>
+  </div>
+</div>
+
+<div id="setup" style="display:none">
   <div class="setup-form">
     <div id="scheduleSection" style="display:none">
     <label>Load players from schedule:</label>
@@ -169,7 +199,12 @@
     </div>
     <button onclick="loadFromSignups()" style="background:#0f3460;margin-bottom:12px">📋 Load from Signups</button>
     <label>Court Numbers (comma-separated, e.g. 3, 5, 7):</label>
-    <input type="text" id="courtNumbers" value="1, 2" oninput="updateDummyNames()" style="width:200px;padding:8px;border-radius:8px;border:none;background:#0f3460;color:#eee;font-size:14px;margin-bottom:12px">
+    <input type="text" id="courtNumbers" value="1, 2" oninput="updateDummyNames()" style="width:200px;padding:8px;border-radius:8px;border:none;background:#0f3460;color:#eee;font-size:14px;margin-bottom:8px">
+    <label>Players per court:</label>
+    <select id="playersPerCourt" style="width:100px;padding:8px;border-radius:8px;border:none;background:#0f3460;color:#eee;font-size:14px;margin-bottom:12px">
+      <option value="4">4</option>
+      <option value="5">5</option>
+    </select>
     <label>Players:</label>
     <div id="playerList" style="margin-bottom:12px"></div>
     <div id="sessionScanStatus" style="font-size:12px;color:#aaa;margin-bottom:8px"></div>
@@ -198,6 +233,7 @@
     </div>
     <div id="formatInfo" style="display:none;background:#0f3460;padding:12px;border-radius:8px;margin-bottom:10px;font-size:12px;color:#ccc;line-height:1.6"></div>
     <button onclick="startGame()" style="width:100%;margin:10px 0">▶ Start Game</button>
+    <button onclick="backToRooms()" style="background:#0f3460">← Groups</button>
     <button onclick="logout()" style="background:#0f3460">🚪 Logout</button>
   </div>
 </div>
@@ -947,6 +983,15 @@ function logout() {
   location.reload();
 }
 
+function backToRooms() {
+  if (db) db.off();
+  currentRoom = null;
+  document.getElementById('setup').style.display = 'none';
+  document.getElementById('game').style.display = 'none';
+  document.getElementById('roomSelect').style.display = 'block';
+  loadRooms();
+}
+
 const FORMAT_INFO = {
   classic: '<strong>🏆 King of the Court</strong><br><br><strong>How it works:</strong><br>1. Players seeded by rating across courts (4 per court). Court 1 is the "top" court.<br>2. Teams each round: #1+#4 (Top) vs #2+#3 (Bottom)<br>3. Winners become Seeds 1 & 2, losers become Seeds 3 & 4<br>4. Seed 4 (bottom loser) drops to the court below as Seed 1<br>5. Top winner from the court below promotes up as Seed 4<br>6. 2 consecutive losses = extra drop<br><br><strong>Goal:</strong> Fight your way to Court 1 and stay there. Best players naturally rise to the top.',
   dupr: '<strong>📊 DUPR Recordable</strong><br><br><strong>How it works:</strong><br>1. Same rotation as King of the Court<br>2. Requires entering scores (not just win/loss)<br>3. Records all games: winners, losers, and score<br>4. Match log shown during and after session<br>5. Use the log to enter games on dupr.gg for official rating updates<br><br><strong>Tip:</strong> Organizer can view all past DUPR logs from the organizer panel.',
@@ -968,33 +1013,109 @@ function showFormatInfo() {
   el.dataset.format = format;
 }
 
+function showRoomFormatInfo() {
+  const el = document.getElementById('roomFormatInfo');
+  const format = document.getElementById('roomFormat').value;
+  if (el.style.display === 'block' && el.dataset.format === format) { el.style.display = 'none'; return; }
+  el.innerHTML = FORMAT_INFO[format] || '';
+  el.style.display = 'block';
+  el.dataset.format = format;
+}
+
+let currentRoom = null;
+
 function initApp() {
   getDb();
-  db = firebase.database().ref(sessionKey + '/game');
+  // Show room selector
+  document.getElementById('roomSelect').style.display = 'block';
+  document.getElementById('syncStatus').textContent = '';
+  loadRooms();
+}
 
-  // Listen for real-time updates from Firebase
-  db.on('value', (snapshot) => {
-  const data = snapshot.val();
-  if (data && data.players && data.players.length) {
-    state = data;
-    state.pendingResults = state.pendingResults || {};
-    state.history = state.history || [];
-    document.getElementById('setup').style.display = 'none';
-    document.getElementById('game').style.display = 'block';
-    render();
-  } else {
-    document.getElementById('setup').style.display = 'block';
-    document.getElementById('game').style.display = 'none';
-  }
-  updateSyncStatus('✅ Connected');
+function loadRooms() {
+  // Load active games
+  getDb().ref(sessionKey + '/rooms').once('value', snap => {
+    const rooms = snap.val() || {};
+    const el = document.getElementById('activeGames');
+    const active = Object.entries(rooms).filter(([id, r]) => r.game && r.game.players && r.game.players.length);
+    if (!active.length) { el.innerHTML = ''; return; }
+    el.innerHTML = '<label style="font-size:13px;color:#aaa;display:block;margin-bottom:6px">Active games:</label>' +
+      active.map(([id, r]) => {
+        const playerCount = r.game.players.length;
+        const format = r.game.gameFormat || '?';
+        const name = r.name || id;
+        return `<div onclick="joinRoom('${id}')" style="padding:12px;margin:6px 0;background:#0f3460;border-radius:8px;cursor:pointer;display:flex;justify-content:space-between;align-items:center" onmouseover="this.style.background='#16213e'" onmouseout="this.style.background='#0f3460'">` +
+          `<span style="color:#4ecca3;font-weight:600">${name}</span>` +
+          `<span style="color:#666;font-size:12px">${playerCount} players · ${format}</span></div>`;
+      }).join('');
   });
-  initDocInput();
-  fetchSchedule();
+  // Load signup sheets into dropdown
+  getDb().ref('signups').once('value', snap => {
+    const data = snap.val() || {};
+    const sel = document.getElementById('roomSignupSheet');
+    sel.innerHTML = '<option value="">-- No signup sheet (manual) --</option>';
+    Object.entries(data).filter(([k, v]) => v.active).forEach(([date, v]) => {
+      const count = v.players ? Object.keys(v.players).length : 0;
+      sel.innerHTML += `<option value="${date}">${date.replace(/-/g, ' ')} (${count} players)</option>`;
+    });
+  });
+}
+
+function startNewRoom() {
+  const sheet = document.getElementById('roomSignupSheet').value;
+  const format = document.getElementById('roomFormat').value;
+  const roomId = (sheet || 'manual') + '_' + format;
+  const name = (sheet ? sheet.replace(/-/g, ' ') : 'Manual') + ' — ' + format;
+  getDb().ref(sessionKey + '/rooms/' + roomId + '/name').set(name).then(() => {
+    joinRoom(roomId);
+    // Auto-load players from signup sheet if selected
+    if (sheet) {
+      getDb().ref('signups/' + sheet + '/players').once('value', snap => {
+        const data = snap.val();
+        if (!data) return;
+        const entries = Object.values(data).sort((a, b) => a.ts - b.ts);
+        const names = entries.map(e => e.name);
+        const duprs = entries.map(e => e.dupr || e.clubRating || 0);
+        renderPlayerList(names, duprs);
+        autoAdjustCourts(names.length);
+        document.getElementById('gameFormat').value = format;
+      });
+    }
+  });
+}
+
+function createRoom() {}
+
+function joinRoom(roomId) {
+  currentRoom = roomId;
+  document.getElementById('roomSelect').style.display = 'none';
+  getDb().ref(sessionKey + '/rooms').off();
+  initRoomGame();
+}
+
+function initRoomGame() {
+  db = firebase.database().ref(sessionKey + '/rooms/' + currentRoom + '/game');
+
+  db.on('value', (snapshot) => {
+    const data = snapshot.val();
+    if (data && data.players && data.players.length) {
+      state = data;
+      state.pendingResults = state.pendingResults || {};
+      state.history = state.history || [];
+      document.getElementById('setup').style.display = 'none';
+      document.getElementById('game').style.display = 'block';
+      render();
+    } else {
+      document.getElementById('setup').style.display = 'block';
+      document.getElementById('game').style.display = 'none';
+    }
+    updateSyncStatus('✅ Connected');
+  });
   renderPlayerList(['']);
   if (sessionKey === 'pickle2026') {
     document.getElementById('scheduleSection').style.display = 'block';
   }
-} // end initApp
+} // end initRoomGame
 
 function updateSyncStatus(msg) {
   const el = document.getElementById('syncStatus');
@@ -1020,9 +1141,11 @@ function startGame(dupr) {
   const courtLabels = getCourtNumbers();
   const numCourts = courtLabels.length;
   const format = document.getElementById('gameFormat').value;
+  const ppc = parseInt(document.getElementById('playersPerCourt').value) || 4;
   if (names.length < 4) return alert('Need at least 4 players.');
   state.players = names.map((name, i) => ({ name, seed: i + 1, consecLosses: 0, dupr: duprs[i] || 0, wins: 0, losses: 0, byeCount: 0 }));
   state.courtLabels = courtLabels;
+  state.playersPerCourt = ppc;
   state.gameFormat = format;
   state.duprMode = (format === 'dupr');
   state.startingDuprs = state.duprMode ? Object.fromEntries(names.map((name, i) => [name, duprs[i] || 0])) : null;
@@ -1034,17 +1157,17 @@ function startGame(dupr) {
   state.sessionStart = new Date().toISOString();
   state.sessionDate = document.getElementById('dateSelect') ? (document.getElementById('dateSelect').value || 'Custom Game') : 'Custom Game';
   state.isQuickGame = false;
-  if (format !== 'classic' && format !== 'dupr') {
+  if (format === 'classic') {
+    // Classic: handle odd players with bye
+    if (names.length % 4 !== 0) {
+      const sitOut = names.length % 4;
+      const sorted = [...state.players].sort((a, b) => (a.byeCount || 0) - (b.byeCount || 0) || Math.random() - 0.5);
+      state.bye = sorted.slice(names.length - sitOut).map(p => p.name);
+      sorted.slice(names.length - sitOut).forEach(p => { p.byeCount = (p.byeCount || 0) + 1; });
+      state.players = sorted;
+    }
+  } else {
     state.matchups = generateMatchups(format);
-  } else if (names.length % 4 !== 0) {
-    // King of the Court with odd players — sit some out
-    const sitOut = names.length % 4;
-    const sorted = [...state.players].sort((a, b) => (a.byeCount || 0) - (b.byeCount || 0) || Math.random() - 0.5);
-    state.bye = sorted.slice(names.length - sitOut).map(p => p.name);
-    sorted.slice(names.length - sitOut).forEach(p => { p.byeCount = (p.byeCount || 0) + 1; });
-    // Reorder players: active first, bye excluded
-    const activeNames = sorted.slice(0, names.length - sitOut);
-    state.players = [...activeNames, ...sorted.slice(names.length - sitOut)];
   }
   document.getElementById('setup').style.display = 'none';
   document.getElementById('game').style.display = 'block';
@@ -1056,13 +1179,13 @@ function generateMatchups(format) {
   const players = state.players;
   const n = players.length;
   const numCourts = state.courtLabels.length;
-  const maxOnCourt = numCourts * 4;
+  const ppc = state.playersPerCourt || 4;
+  const maxOnCourt = numCourts * ppc;
   let active, bye = [];
 
-  // Fair bye rotation: whoever has sat out least sits out next
-  // Completely independent of game results
+  // Fair bye rotation
   const playable = Math.min(n, maxOnCourt);
-  const needed = playable - (playable % 4); // round down to multiple of 4
+  const needed = playable - (playable % ppc);
   const sitOut = n - needed;
 
   if (sitOut > 0) {
@@ -1080,16 +1203,21 @@ function generateMatchups(format) {
   const courts = [];
   if (format === 'random') {
     const shuffled = [...active].sort(() => Math.random() - 0.5);
-    for (let i = 0; i < shuffled.length; i += 4) courts.push(shuffled.slice(i, i + 4));
+    for (let i = 0; i < shuffled.length; i += ppc) courts.push(shuffled.slice(i, i + ppc));
+  } else if (format === 'dupr') {
+    const sorted = [...active].sort((a, b) => (b.dupr || 0) - (a.dupr || 0));
+    const jittered = sorted.map(p => ({ ...p, jit: (p.dupr || 0) + (Math.random() * 0.3 - 0.15) }));
+    jittered.sort((a, b) => b.jit - a.jit);
+    for (let i = 0; i < jittered.length; i += ppc) courts.push(jittered.slice(i, i + ppc));
   } else if (format === 'balancedrr') {
     const sorted = [...active].sort((a, b) => (b.dupr || 0) - (a.dupr || 0));
-    for (let i = 0; i < sorted.length; i += 4) courts.push(sorted.slice(i, i + 4));
+    for (let i = 0; i < sorted.length; i += ppc) courts.push(sorted.slice(i, i + ppc));
   } else if (format === 'swiss') {
     const sorted = [...active].sort((a, b) => (b.wins - b.losses) - (a.wins - a.losses) || Math.random() - 0.5);
-    for (let i = 0; i < sorted.length; i += 4) courts.push(sorted.slice(i, i + 4));
+    for (let i = 0; i < sorted.length; i += ppc) courts.push(sorted.slice(i, i + ppc));
   } else if (format === 'ladder') {
     const sorted = [...active].sort((a, b) => (b.wins - b.losses) - (a.wins - a.losses) || (b.dupr || 0) - (a.dupr || 0));
-    for (let i = 0; i < sorted.length; i += 4) courts.push(sorted.slice(i, i + 4));
+    for (let i = 0; i < sorted.length; i += ppc) courts.push(sorted.slice(i, i + ppc));
   } else if (format === 'fixed') {
     // Fixed partners: pair in order, rotate opponents
     if (!state.teams) {
@@ -1130,13 +1258,13 @@ function generateMatchups(format) {
     return courts;
   } else if (format === 'roundrobin') {
     const shuffled = [...active].sort(() => Math.random() - 0.5);
-    for (let i = 0; i < shuffled.length; i += 4) courts.push(shuffled.slice(i, i + 4));
+    for (let i = 0; i < shuffled.length; i += ppc) courts.push(shuffled.slice(i, i + ppc));
   } else if (format === 'elimination') {
     const sorted = [...active].sort((a, b) => (b.dupr || 0) - (a.dupr || 0));
-    for (let i = 0; i < sorted.length; i += 4) courts.push(sorted.slice(i, i + 4));
+    for (let i = 0; i < sorted.length; i += ppc) courts.push(sorted.slice(i, i + ppc));
   } else {
     const shuffled = [...active].sort(() => Math.random() - 0.5);
-    for (let i = 0; i < shuffled.length; i += 4) courts.push(shuffled.slice(i, i + 4));
+    for (let i = 0; i < shuffled.length; i += ppc) courts.push(shuffled.slice(i, i + ppc));
   }
 
   return courts;
@@ -1147,7 +1275,7 @@ function resetGame() {
   clearInterval(timerInterval); timerInterval = null;
   if (state.history && state.history.length && !state.isQuickGame) {
     const key = (state.sessionDate || 'Custom') + '_' + (state.sessionStart || new Date().toISOString()).replace(/[.#$/\[\]]/g, '_');
-    firebase.database().ref(sessionKey + '/archive/' + key.replace(/[.#$/\[\]]/g, '_')).set({
+    firebase.database().ref(sessionKey + '/rooms/' + currentRoom + '/archive/' + key.replace(/[.#$/\[\]]/g, '_')).set({
       sessionDate: state.sessionDate || 'Custom Game',
       sessionStart: state.sessionStart,
       sessionEnd: new Date().toISOString(),
@@ -1171,7 +1299,7 @@ function endSession() {
   let promise = Promise.resolve();
   if (snap.players && snap.players.length && !snap.isQuickGame) {
     const key = (snap.sessionDate || 'Custom') + '_' + (snap.sessionStart || new Date().toISOString()).replace(/[.#$/\[\]]/g, '_');
-    promise = firebase.database().ref(sessionKey + '/archive/' + key.replace(/[.#$/\[\]]/g, '_')).set({
+    promise = firebase.database().ref(sessionKey + '/rooms/' + currentRoom + '/archive/' + key.replace(/[.#$/\[\]]/g, '_')).set({
       sessionDate: snap.sessionDate || 'Custom Game',
       sessionStart: snap.sessionStart,
       sessionEnd: new Date().toISOString(),
@@ -1367,40 +1495,74 @@ function render() {
   let html = '';
   if (swapMode) html += `<div class="swap-bar">${swapFirst !== null ? '👆 Now tap the second player to swap with <strong>' + state.players[swapFirst].name + '</strong>' : '👆 Tap a player to select, then tap another to swap'}</div>`;
   courts.forEach((court, ci) => {
-    const allResolved = state.pendingResults[ci] !== undefined;
     const cl = (state.courtLabels && state.courtLabels[ci]) || ci + 1;
     html += `<div class="court"><h2>Court ${cl}</h2>`;
-    html += `<div class="matchups"><div class="match">`;
-    const tA = [court[0], court[3]];
-    const tB = [court[1], court[2]];
-    // Top team
-    html += `<div class="team"><span class="name">`;
-    html += swapMode ? tA.map((p, ti) => { const gi = ci*4+([0,3][ti]); const sel = swapFirst===gi?' swap-sel':''; return `<span class="player${sel} swap-mode" onclick="swapPlayer(${gi})">${p.name}${fmtDupr(p)}</span>`; }).join(' & ') : `${tA[0].name}${fmtDupr(tA[0])} & ${tA[1].name}${fmtDupr(tA[1])}`;
-    html += `</span></div>`;
-    html += `<div class="vs">VS</div>`;
-    // Bottom team
-    html += `<div class="team"><span class="name">`;
-    html += swapMode ? tB.map((p, ti) => { const gi = ci*4+([1,2][ti]); const sel = swapFirst===gi?' swap-sel':''; return `<span class="player${sel} swap-mode" onclick="swapPlayer(${gi})">${p.name}${fmtDupr(p)}</span>`; }).join(' & ') : `${tB[0].name}${fmtDupr(tB[0])} & ${tB[1].name}${fmtDupr(tB[1])}`;
-    html += `</span></div>`;
-    if (!allResolved) {
-      if (state.duprMode) {
-        html += `<div style="display:flex;align-items:center;justify-content:center;gap:8px;margin:8px 0">`;
-        html += `<input type="number" id="scoreA_${ci}" min="0" max="15" style="width:48px;padding:6px;border-radius:6px;border:none;background:#16213e;color:#4ecca3;font-size:16px;text-align:center" placeholder="0">`;
-        html += `<span style="color:#aaa">–</span>`;
-        html += `<input type="number" id="scoreB_${ci}" min="0" max="15" style="width:48px;padding:6px;border-radius:6px;border:none;background:#16213e;color:#e94560;font-size:16px;text-align:center" placeholder="0">`;
+
+    if (state.duprMode && court.length >= 4) {
+      // DUPR: generate all doubles combos
+      // 4 players: 3 games (all combos), 5 players: 5 games (each sits once)
+      const combos = [];
+      if (court.length === 4) {
+        combos.push({ a: [0, 1], b: [2, 3] });
+        combos.push({ a: [0, 2], b: [1, 3] });
+        combos.push({ a: [0, 3], b: [1, 2] });
+      } else if (court.length === 5) {
+        // Each player sits out once: 5 games
+        for (let sit = 0; sit < 5; sit++) {
+          const playing = [0,1,2,3,4].filter(i => i !== sit);
+          combos.push({ a: [playing[0], playing[1]], b: [playing[2], playing[3]], sit });
+        }
+      }
+      combos.forEach((combo, gi) => {
+        const gameKey = `${ci}_${gi}`;
+        const resolved = state.pendingResults[gameKey] !== undefined;
+        const teamA = combo.a.map(i => court[i]);
+        const teamB = combo.b.map(i => court[i]);
+        const sittingOut = combo.sit !== undefined ? court[combo.sit].name : null;
+        html += `<div class="match" style="margin-bottom:8px">`;
+        html += `<div style="color:#aaa;font-size:14px;margin-bottom:4px">Game ${gi+1}${sittingOut ? ' <span style="color:#f0a500">('+sittingOut+' sits)</span>' : ''}</div>`;
+        html += `<div class="team"><span class="name">${teamA.map(p => p.name + fmtDupr(p)).join(' & ')}</span></div>`;
+        html += `<div class="vs">VS</div>`;
+        html += `<div class="team"><span class="name">${teamB.map(p => p.name + fmtDupr(p)).join(' & ')}</span></div>`;
+        if (!resolved) {
+          html += `<div style="display:flex;align-items:center;justify-content:center;gap:8px;margin:8px 0">`;
+          html += `<input type="number" id="scoreA_${gameKey}" min="0" max="21" style="width:48px;padding:6px;border-radius:6px;border:none;background:#16213e;color:#4ecca3;font-size:16px;text-align:center" placeholder="0">`;
+          html += `<span style="color:#aaa">–</span>`;
+          html += `<input type="number" id="scoreB_${gameKey}" min="0" max="21" style="width:48px;padding:6px;border-radius:6px;border:none;background:#16213e;color:#e94560;font-size:16px;text-align:center" placeholder="0">`;
+          html += `</div>`;
+          html += `<button onclick="recordDuprScore('${gameKey}')">✅ Submit</button>`;
+        } else {
+          const r = state.pendingResults[gameKey];
+          html += `<div style="text-align:center;color:#4ecca3;margin-top:4px;font-size:13px;font-weight:600">✓ ${r.winner === 'A' ? teamA.map(p=>p.name).join(' & ') : teamB.map(p=>p.name).join(' & ')} win ${r.scoreA}–${r.scoreB}</div>`;
+          html += `<button onclick="clearResult('${gameKey}')" style="background:#0f3460;margin-top:4px;font-size:11px">↩ Change</button>`;
+        }
         html += `</div>`;
-        html += `<button onclick="recordScore(${ci})">✅ Submit</button>`;
-      } else {
+      });
+    } else {
+      // Non-DUPR: single game per court
+      html += `<div class="matchups"><div class="match">`;
+      const tA = [court[0], court[3]];
+      const tB = [court[1], court[2]];
+      html += `<div class="team"><span class="name">`;
+      html += swapMode ? tA.map((p, ti) => { const gi = ci*4+([0,3][ti]); const sel = swapFirst===gi?' swap-sel':''; return `<span class="player${sel} swap-mode" onclick="swapPlayer(${gi})">${p.name}${fmtDupr(p)}</span>`; }).join(' & ') : `${tA[0].name}${fmtDupr(tA[0])} & ${tA[1].name}${fmtDupr(tA[1])}`;
+      html += `</span></div>`;
+      html += `<div class="vs">VS</div>`;
+      html += `<div class="team"><span class="name">`;
+      html += swapMode ? tB.map((p, ti) => { const gi = ci*4+([1,2][ti]); const sel = swapFirst===gi?' swap-sel':''; return `<span class="player${sel} swap-mode" onclick="swapPlayer(${gi})">${p.name}${fmtDupr(p)}</span>`; }).join(' & ') : `${tB[0].name}${fmtDupr(tB[0])} & ${tB[1].name}${fmtDupr(tB[1])}`;
+      html += `</span></div>`;
+      const allResolved = state.pendingResults[ci] !== undefined;
+      if (!allResolved) {
         html += `<div style="display:flex;gap:8px;margin-top:8px"><button onclick="recordResult(${ci},'A')" style="flex:1">🏆 Top</button>`;
         html += `<button onclick="recordResult(${ci},'B')" style="flex:1;background:#0f3460">🏆 Bottom</button></div>`;
+      } else {
+        const r = state.pendingResults[ci];
+        const isObj = typeof r === 'object';
+        const winner = isObj ? r.winner : r;
+        const label = winner === 'A' ? 'Top' : 'Bottom';
+        html += `<div style="text-align:center;color:#4ecca3;margin-top:8px;font-weight:600">✓ ${label} wins${isObj ? ' ' + r.scoreA + '–' + r.scoreB : ''}</div>`;
+        html += `<button onclick="clearResult(${ci})" style="background:#0f3460;margin-top:4px;font-size:12px">↩ Change</button>`;
       }
-    } else {
-      const r = state.pendingResults[ci];
-      const isObj = typeof r === 'object';
-      const winner = isObj ? r.winner : r;
-      const label = winner === 'A' ? 'Top' : 'Bottom';
-      html += `<div style="text-align:center;color:#4ecca3;margin-top:8px;font-weight:600">✓ ${label} wins${isObj ? ' ' + r.scoreA + '–' + r.scoreB : ''}</div>`;
-      html += `<button onclick="clearResult(${ci})" style="background:#0f3460;margin-top:4px;font-size:12px">↩ Change</button>`;
+      html += `</div></div>`;
     }
     html += `</div></div></div>`;
   });
@@ -1408,7 +1570,7 @@ function render() {
 
   // Show bye players
   if (state.bye && state.bye.length) {
-    document.getElementById('courts').innerHTML += `<div style="text-align:center;padding:8px;margin-top:8px;background:#0f3460;border-radius:8px;font-size:13px;color:#aaa">⏸ Sitting out: ${state.bye.join(', ')}</div>`;
+    document.getElementById('courts').innerHTML += `<div style="text-align:center;padding:12px;margin-top:8px;background:#0f3460;border-radius:8px;font-size:16px;color:#aaa">⏸ Sitting out: ${state.bye.join(', ')}</div>`;
   }
 
   // Show standings for non-classic formats
@@ -1438,7 +1600,16 @@ function render() {
     if (el) el.value = val;
   });
 
-  if (Object.keys(state.pendingResults).length === numCourts) {
+  // Show "Apply Results" when all games are recorded
+  if (state.duprMode) {
+    const needed = courts.reduce((sum, c) => sum + (c.length === 5 ? 5 : 3), 0);
+    const have = Object.keys(state.pendingResults).length;
+    if (have === needed) {
+      document.getElementById('courts').innerHTML += `<div style="text-align:center;margin-top:10px"><button onclick="resolveRound()">Apply Results & Next Round →</button></div>`;
+    } else if (have > 0) {
+      document.getElementById('courts').innerHTML += `<div style="text-align:center;margin-top:10px;color:#aaa;font-size:12px">${have}/${needed} games recorded</div>`;
+    }
+  } else if (Object.keys(state.pendingResults).length === numCourts) {
     document.getElementById('courts').innerHTML += `<div style="text-align:center;margin-top:10px"><button onclick="resolveRound()">Apply Results & Next Round →</button></div>`;
   }
 
@@ -1469,6 +1640,16 @@ function recordScore(courtIdx) {
   if (isNaN(a) || isNaN(b) || a < 0 || b < 0) return alert('Enter valid scores.');
   if (a === b) return alert('Scores can\'t be tied.');
   state.pendingResults[courtIdx] = { winner: a > b ? 'A' : 'B', scoreA: a, scoreB: b };
+  saveState();
+  render();
+}
+
+function recordDuprScore(gameKey) {
+  const a = parseInt(document.getElementById('scoreA_' + gameKey).value);
+  const b = parseInt(document.getElementById('scoreB_' + gameKey).value);
+  if (isNaN(a) || isNaN(b) || a < 0 || b < 0) return alert('Enter valid scores.');
+  if (a === b) return alert('Scores can\'t be tied.');
+  state.pendingResults[gameKey] = { winner: a > b ? 'A' : 'B', scoreA: a, scoreB: b };
   saveState();
   render();
 }
@@ -1533,7 +1714,7 @@ function resolveRound() {
     loseIdxs.forEach(i => { const p = state.players.find(x => x.name === court[i].name); if (p) p.losses = (p.losses || 0) + 1; });
   }
 
-  if (format === 'classic' || format === 'dupr') {
+  if (format === 'classic') {
     // Classic king-of-the-court logic
     for (let ci = 0; ci < numCourts; ci++) {
       const r = state.pendingResults[ci];
@@ -1545,25 +1726,6 @@ function resolveRound() {
       losers.forEach(i => { state.players[base + i].consecLosses += 1; });
     }
 
-    // DUPR match log
-    if (state.duprMode) {
-      if (!state.duprLog) state.duprLog = [];
-      for (let ci = 0; ci < numCourts; ci++) {
-        const r = state.pendingResults[ci];
-        const w = (typeof r === 'object') ? r.winner : r;
-        const base = ci * 4;
-        const winIdxs = w === 'A' ? [0, 3] : [1, 2];
-        const loseIdxs = w === 'A' ? [1, 2] : [0, 3];
-        const wScore = (typeof r === 'object') ? (w === 'A' ? r.scoreA : r.scoreB) : null;
-        const lScore = (typeof r === 'object') ? (w === 'A' ? r.scoreB : r.scoreA) : null;
-        state.duprLog.push({
-          winners: winIdxs.map(i => state.players[base + i].name),
-          losers: loseIdxs.map(i => state.players[base + i].name),
-          winScore: wScore || 11,
-          loseScore: lScore || 0
-        });
-      }
-    }
 
     const newCourts = [];
     for (let ci = 0; ci < numCourts; ci++) {
@@ -1639,8 +1801,75 @@ function resolveRound() {
         });
       }
     }
-    // Regenerate matchups for next round
-    state.matchups = generateMatchups(format);
+
+    // DUPR format: rank players within each court, move top/bottom between courts
+    if (format === 'dupr' && numCourts > 1) {
+      const courtRankings = [];
+      for (let ci = 0; ci < numCourts; ci++) {
+        const court = courts[ci];
+        const numGames = court.length === 5 ? 5 : 3;
+        // Generate combos for this court
+        const combos = [];
+        if (court.length === 4) {
+          combos.push([0,1,2,3], [0,2,1,3], [0,3,1,2]);
+        } else if (court.length === 5) {
+          for (let sit = 0; sit < 5; sit++) {
+            const playing = [0,1,2,3,4].filter(i => i !== sit);
+            combos.push([playing[0], playing[1], playing[2], playing[3]]);
+          }
+        }
+        // Calculate individual stats
+        const stats = court.map(p => ({ player: p, wins: 0, pf: 0, pa: 0 }));
+        for (let gi = 0; gi < numGames; gi++) {
+          const gameKey = `${ci}_${gi}`;
+          const r = state.pendingResults[gameKey];
+          if (!r) continue;
+          const c = combos[gi];
+          const teamAIdxs = [c[0], c[1]];
+          const teamBIdxs = [c[2], c[3]];
+          if (r.winner === 'A') {
+            teamAIdxs.forEach(i => { stats[i].wins++; stats[i].pf += r.scoreA; stats[i].pa += r.scoreB; });
+            teamBIdxs.forEach(i => { stats[i].pf += r.scoreB; stats[i].pa += r.scoreA; });
+          } else {
+            teamBIdxs.forEach(i => { stats[i].wins++; stats[i].pf += r.scoreA; stats[i].pa += r.scoreB; });
+            teamAIdxs.forEach(i => { stats[i].pf += r.scoreB; stats[i].pa += r.scoreA; });
+          }
+          // Record to DUPR log
+          const teamA = teamAIdxs.map(i => court[i]);
+          const teamB = teamBIdxs.map(i => court[i]);
+          const winners = r.winner === 'A' ? teamA : teamB;
+          const losers = r.winner === 'A' ? teamB : teamA;
+          state.duprLog.push({
+            winners: winners.map(p => p.name),
+            losers: losers.map(p => p.name),
+            winScore: r.winner === 'A' ? r.scoreA : r.scoreB,
+            loseScore: r.winner === 'A' ? r.scoreB : r.scoreA
+          });
+          // Update individual totals
+          winners.forEach(p => { const pl = state.players.find(x => x.name === p.name); if (pl) pl.wins = (pl.wins || 0) + 1; });
+          losers.forEach(p => { const pl = state.players.find(x => x.name === p.name); if (pl) pl.losses = (pl.losses || 0) + 1; });
+        }
+        // Rank: wins desc, point diff desc, PF desc
+        stats.sort((a, b) => (b.wins - a.wins) || ((b.pf - b.pa) - (a.pf - a.pa)) || (b.pf - a.pf));
+        courtRankings.push(stats.map(s => s.player));
+      }
+      // Movement: bottom of upper court drops, top of lower court promotes
+      for (let ci = 0; ci < numCourts - 1; ci++) {
+        const upperCourt = courtRankings[ci];
+        const lowerCourt = courtRankings[ci + 1];
+        const dropper = upperCourt[upperCourt.length - 1];
+        const promoter = lowerCourt[0];
+        upperCourt[upperCourt.length - 1] = promoter;
+        lowerCourt[0] = dropper;
+        roundLog += `<br>⬆️ ${promoter.name} promotes to Court ${ci+1} | ⬇️ ${dropper.name} drops to Court ${ci+2}`;
+      }
+      // Set matchups for next round
+      state.matchups = courtRankings;
+      state.players = courtRankings.flat().concat(state.players.filter(p => state.bye && state.bye.includes(p.name)));
+    } else {
+      // Other formats: regenerate matchups
+      state.matchups = generateMatchups(format);
+    }
   }
 
   if (state.bye && state.bye.length) roundLog += `<br><em>⏸ Bye: ${state.bye.join(', ')}</em>`;
@@ -1701,8 +1930,11 @@ function playerNameSearch(input, idx) {
   }, 400);
 }
 function autoAdjustCourts(playerCount) {
-  const courts = Math.max(1, Math.floor(playerCount / 4));
+  // Try 4 per court first, if remainder is 0 or manageable
+  const ppc = playerCount % 4 === 0 ? 4 : (playerCount % 5 === 0 ? 5 : 4);
+  const courts = Math.max(1, Math.floor(playerCount / ppc));
   document.getElementById('courtNumbers').value = Array.from({length: courts}, (_, i) => i + 1).join(', ');
+  document.getElementById('playersPerCourt').value = ppc;
 }
 
 function pickPlayerName(idx, name, dupr) {
