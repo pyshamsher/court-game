@@ -131,6 +131,10 @@
         </div>
         <div id="signupLinkMsg" style="font-size:12px;margin-top:4px;color:#4ecca3;word-break:break-all"></div>
       </div>
+      <div style="margin-top:10px">
+        <label style="font-size:13px;color:#aaa">All signup sheets:</label>
+        <div id="adminSignupList" style="margin-top:4px;font-size:13px"></div>
+      </div>
       <div style="margin-top:14px;border-top:1px solid #333;padding-top:10px">
         <label style="font-size:13px;color:#aaa">Change admin passcode:</label>
         <div style="display:flex;gap:6px;margin-top:4px">
@@ -539,10 +543,12 @@ async function scanSignupSheetForSignup(event) {
     const norm = s => s.toLowerCase().replace(/[^a-z]/g, '');
     const existingNames = new Set(Object.values(existing).map(p => norm(p.name)));
     let added = 0, skipped = 0;
+    const notFound = [];
     for (let i = 0; i < names.length; i++) {
       if (existingNames.has(norm(names[i]))) { skipped++; continue; }
       status.textContent = `🔄 Looking up ${names[i]}... (${i+1}/${names.length})`;
       let dupr = 0;
+      let finalName = names[i];
       try {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 6000);
@@ -550,13 +556,28 @@ async function scanSignupSheetForSignup(event) {
         clearTimeout(timeout);
         const d = await res.json();
         dupr = d.dupr || 0;
+        if (d.name) finalName = d.name;
+        // Try reversed name if not found (Last First → First Last)
+        if (!dupr && names[i].split(/\s+/).length === 2) {
+          const reversed = names[i].split(/\s+/).reverse().join(' ');
+          const c2 = new AbortController();
+          const t2 = setTimeout(() => c2.abort(), 6000);
+          const r2 = await fetch(DUPR_PROXY + '/lookup?name=' + encodeURIComponent(reversed), { signal: c2.signal });
+          clearTimeout(t2);
+          const d2 = await r2.json();
+          if (d2.dupr) { dupr = d2.dupr; finalName = d2.name || reversed; }
+        }
       } catch (e) {}
-      if (!dupr) continue; // Only add if DUPR found
-      signupRef(date).push({ name: names[i], clubRating: 0, dupr, ts: Date.now() });
-      existingNames.add(norm(names[i]));
+      if (!dupr) { notFound.push(names[i]); }
+      if (existingNames.has(norm(finalName))) { if(!dupr) notFound.pop(); skipped++; continue; }
+      signupRef(date).push({ name: finalName, clubRating: 0, dupr: dupr || 0, ts: Date.now() });
+      existingNames.add(norm(finalName));
       added++;
     }
-    status.textContent = `✅ Added ${added} players with DUPR ratings (${names.length - added - skipped} not found, ${skipped} duplicates)`;
+    let msg = `✅ Added ${added} players with DUPR ratings`;
+    if (skipped) msg += ` (${skipped} duplicates skipped)`;
+    if (notFound.length) msg += `<br><span style="color:#ff6b6b">❌ Not found (${notFound.length}):</span><br><span style="color:#aaa">${notFound.join(', ')}</span>`;
+    status.innerHTML = msg;
     status.style.color = '#4ecca3';
   } catch (e) {
     status.textContent = '❌ OCR error: ' + e.message;
@@ -788,6 +809,25 @@ function deleteSignupDate(date) {
   getDb().ref('signups/' + date).remove().then(() => loadOrganizerSignups());
 }
 
+function loadAdminSignups() {
+  getDb().ref('signups').once('value').then(snap => {
+    const data = snap.val();
+    const el = document.getElementById('adminSignupList');
+    if (!el) return;
+    if (!data) { el.textContent = 'None.'; return; }
+    const all = Object.entries(data).filter(([k, v]) => v.active);
+    if (!all.length) { el.textContent = 'None.'; return; }
+    el.innerHTML = all.map(([date, v]) => {
+      const count = v.players ? Object.keys(v.players).length : 0;
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid #333"><span style="color:#eee">${date.replace(/-/g, ' ')} <span style="color:#666">(${count})</span></span><button onclick="adminDeleteSignup('${date}')" style="margin:0;padding:2px 8px;font-size:11px;background:#e94560">🗑️</button></div>`;
+    }).join('');
+  });
+}
+
+function adminDeleteSignup(date) {
+  getDb().ref('signups/' + date).remove().then(() => loadAdminSignups());
+}
+
 function loadOrgSessions() {
   getDb().ref('sessions').once('value').then(snap => {
     const data = snap.val();
@@ -805,7 +845,22 @@ function loadActiveSignups() {
     const data = snap.val();
     const el = document.getElementById('activeSignupList');
     if (!data) { el.textContent = 'No open signups.'; return; }
-    const active = Object.entries(data).filter(([k, v]) => v.active);
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    const months = {JAN:0,FEB:1,MAR:2,APR:3,MAY:4,JUN:5,JUL:6,AUG:7,SEP:8,OCT:9,NOV:10,DEC:11};
+    function parseSignupDate(key) {
+      const parts = key.split('-');
+      const month = months[parts[1]];
+      const day = parseInt(parts[2]);
+      if (month === undefined || !day) return null;
+      return new Date(today.getFullYear(), month, day);
+    }
+    const active = Object.entries(data).filter(([k, v]) => {
+      if (!v.active) return false;
+      const d = parseSignupDate(k);
+      if (!d) return false; // hide unparseable dates
+      return d >= today;
+    });
     if (!active.length) { el.textContent = 'No open signups.'; return; }
     el.innerHTML = active.map(([date, v]) => {
       const count = v.players ? Object.keys(v.players).length : 0;
@@ -880,6 +935,7 @@ function checkPasscode() {
       document.getElementById('adminPanel').style.display = 'block';
       document.getElementById('adminPasscodes').innerHTML = '<div style="margin-bottom:12px;padding:10px;background:#0f3460;border-radius:8px;font-size:13px"><strong style="color:#eee">Current Passcodes:</strong><br>Admin: <span style="color:#4ecca3">' + ADMIN_CODE + '</span><br>Organizer: <span style="color:#4ecca3">' + ORGANIZER_CODE + '</span></div>';
       loadExistingSessions();
+      loadAdminSignups();
       return;
     }
     if (input === ORGANIZER_CODE) {
