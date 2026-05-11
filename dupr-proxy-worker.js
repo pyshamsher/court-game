@@ -3,6 +3,7 @@ const ALLOWED_ORIGINS = [
   'https://pickleball-tracker.surge.sh',
   'https://pickleball-tracker-dev.surge.sh',
   'https://pickleplay.pages.dev',
+  'https://pickleball-ratings.surge.sh',
   'http://localhost',
   'http://127.0.0.1'
 ];
