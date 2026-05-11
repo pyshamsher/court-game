@@ -224,8 +224,8 @@
     <div id="playerList" style="margin-bottom:12px"></div>
     <div id="sessionScanStatus" style="font-size:12px;color:#aaa;margin-bottom:8px"></div>
     <div style="position:relative;margin-bottom:8px">
-      <input type="text" id="sessionDuprSearch" placeholder="Search DUPR or type name..." oninput="onSessionDuprSearch()" onkeydown="if(event.key==='Enter')addTypedPlayer()" style="width:100%;padding:8px;border-radius:8px;border:none;background:#0f3460;color:#eee;font-size:13px">
-      <div id="sessionDuprSuggestions" style="display:none;position:absolute;top:38px;left:0;right:0;background:#0f3460;border-radius:8px;border:1px solid #333;max-height:150px;overflow-y:auto;z-index:10;text-align:left"></div>
+      <input type="text" id="sessionDuprSearch" placeholder="Type player name..." oninput="" onkeydown="if(event.key==='Enter')addTypedPlayer()" style="width:100%;padding:8px;border-radius:8px;border:none;background:#0f3460;color:#eee;font-size:13px">
+
     </div>
     <button onclick="sortByDupr()" style="background:#0f3460;margin-bottom:8px">📊 Sort by DUPR</button>
     <button onclick="showDuprLogin()" style="background:#0f3460;margin-bottom:8px">🔍 Fetch DUPR Ratings</button>
@@ -1228,7 +1228,13 @@ function startGame(dupr) {
     // Classic: handle odd players with bye
     if (names.length % 4 !== 0) {
       const sitOut = names.length % 4;
-      const sorted = [...state.players].sort((a, b) => (a.byeCount || 0) - (b.byeCount || 0) || Math.random() - 0.5);
+      const lastBye = new Set(state.bye || []);
+      const sorted = [...state.players].sort((a, b) => {
+        const aHadBye = lastBye.has(a.name) ? 1 : 0;
+        const bHadBye = lastBye.has(b.name) ? 1 : 0;
+        if (aHadBye !== bHadBye) return bHadBye - aHadBye;
+        return (a.byeCount || 0) - (b.byeCount || 0) || Math.random() - 0.5;
+      });
       state.bye = sorted.slice(names.length - sitOut).map(p => p.name);
       sorted.slice(names.length - sitOut).forEach(p => { p.byeCount = (p.byeCount || 0) + 1; });
       state.players = sorted;
@@ -1256,7 +1262,14 @@ function generateMatchups(format) {
   const sitOut = n - needed;
 
   if (sitOut > 0) {
-    const sorted = [...players].sort((a, b) => (a.byeCount || 0) - (b.byeCount || 0) || Math.random() - 0.5);
+    // Prevent consecutive byes: players who sat out last round go to front (must play)
+    const lastBye = new Set(state.bye || []);
+    const sorted = [...players].sort((a, b) => {
+      const aHadBye = lastBye.has(a.name) ? 1 : 0;
+      const bHadBye = lastBye.has(b.name) ? 1 : 0;
+      if (aHadBye !== bHadBye) return bHadBye - aHadBye; // last-round bye players first (play)
+      return (a.byeCount || 0) - (b.byeCount || 0) || Math.random() - 0.5;
+    });
     active = sorted.slice(0, needed);
     bye = sorted.slice(needed);
     bye.forEach(p => { p.byeCount = (p.byeCount || 0) + 1; });
@@ -1307,16 +1320,28 @@ function generateMatchups(format) {
     const available = matchupList.filter(m => !state.playedMatchups.some(p => p[0] === m[0] && p[1] === m[1]));
     const roundMatchups = available.length ? available : matchupList; // reset if all played
     if (!available.length) state.playedMatchups = [];
-    // Assign to courts
+    // Assign to courts — prioritize teams that had bye last round
+    const lastByeNames = new Set(state.bye || []);
+    const lastByeTeams = new Set(teams.map((t, idx) => t.players.some(p => lastByeNames.has(p.name)) ? idx : -1).filter(i => i >= 0));
     const used = new Set();
     const courts = [];
+    // First pass: ensure last-round bye teams get to play
+    for (const [i, j] of roundMatchups) {
+      if (used.has(i) || used.has(j)) continue;
+      if (courts.length >= numCourts) break;
+      if (lastByeTeams.has(i) || lastByeTeams.has(j)) {
+        courts.push([...teams[i].players, ...teams[j].players]);
+        state.playedMatchups.push([i, j]);
+        used.add(i); used.add(j);
+      }
+    }
+    // Second pass: fill remaining courts
     for (const [i, j] of roundMatchups) {
       if (used.has(i) || used.has(j)) continue;
       if (courts.length >= numCourts) break;
       courts.push([...teams[i].players, ...teams[j].players]);
       state.playedMatchups.push([i, j]);
-      used.add(i);
-      used.add(j);
+      used.add(i); used.add(j);
     }
     // Teams not playing this round are bye
     const playingTeams = new Set([...used]);
@@ -1833,7 +1858,13 @@ function resolveRound() {
     // Rotate bye for next round
     const sitOut = allPlayers.length % 4;
     if (sitOut > 0) {
-      const sorted = [...allPlayers].sort((a, b) => (a.byeCount || 0) - (b.byeCount || 0) || Math.random() - 0.5);
+      const lastBye = new Set(state.bye || []);
+      const sorted = [...allPlayers].sort((a, b) => {
+        const aHadBye = lastBye.has(a.name) ? 1 : 0;
+        const bHadBye = lastBye.has(b.name) ? 1 : 0;
+        if (aHadBye !== bHadBye) return bHadBye - aHadBye;
+        return (a.byeCount || 0) - (b.byeCount || 0) || Math.random() - 0.5;
+      });
       state.bye = sorted.slice(sorted.length - sitOut).map(p => p.name);
       sorted.slice(sorted.length - sitOut).forEach(p => { p.byeCount = (p.byeCount || 0) + 1; });
       state.players = sorted;
@@ -1966,33 +1997,7 @@ function renderPlayerList(names, duprs) {
   });
 }
 
-let playerSearchTimer = null;
-function playerNameSearch(input, idx) {
-  const val = input.value.trim();
-  const box = input.closest('.player-row').querySelector('.player-suggestions');
-  if (val.length < 3) { box.style.display = 'none'; return; }
-  clearTimeout(playerSearchTimer);
-  playerSearchTimer = setTimeout(async () => {
-    try {
-      const res = await fetch(DUPR_PROXY + '/search?name=' + encodeURIComponent(val));
-      const data = await res.json();
-      if (!data.hits || !data.hits.length) { box.style.display = 'none'; return; }
-      box.style.display = 'block';
-      box.innerHTML = `<div onclick="document.querySelectorAll('.player-suggestions').forEach(b=>b.style.display='none')" style="padding:4px 8px;cursor:pointer;color:#666;font-size:11px;border-bottom:1px solid #1a1a2e">✕ dismiss</div>` +
-        data.hits.map(h =>
-        `<div onclick="pickPlayerName(${idx},'${h.name.replace(/'/g,"\\'")}',${h.dupr})" style="padding:6px 8px;cursor:pointer;border-bottom:1px solid #1a1a2e" onmouseover="this.style.background='#16213e'" onmouseout="this.style.background=''">` +
-        `${h.name} <span style="color:#4ecca3">${h.dupr ? h.dupr.toFixed(2) : ''}</span></div>`
-      ).join('');
-    } catch (e) { box.style.display = 'none'; }
-  }, 600);
-}
-// Dismiss all dropdowns on click outside
-document.addEventListener('click', function(e) {
-  if (!e.target.closest('.player-row')) document.querySelectorAll('.player-suggestions').forEach(b => b.style.display = 'none');
-});
 function addNextPlayer(idx) {
-  // Dismiss dropdown
-  document.querySelectorAll('.player-suggestions').forEach(b => b.style.display = 'none');
   // Get current names, add empty row if this is the last filled one
   const rows = document.querySelectorAll('#playerList .player-row');
   const names = [], duprs = [];
@@ -2024,26 +2029,7 @@ function autoAdjustCourts(playerCount) {
   document.getElementById('playersPerCourt').value = ppc;
 }
 
-function pickPlayerName(idx, name, dupr) {
-  const rows = document.querySelectorAll('#playerList .player-row');
-  const names = [], duprs = [];
-  rows.forEach(r => {
-    const n = r.querySelector('.name-input').value.trim();
-    const d = parseFloat(r.querySelector('.dupr-input').value) || 0;
-    if (n) { names.push(n); duprs.push(d); }
-  });
-  // Replace the edited row
-  if (idx < names.length) { names[idx] = name; duprs[idx] = dupr; }
-  else { names.push(name); duprs.push(dupr); }
-  const combined = names.map((n, i) => ({ n, d: duprs[i] }));
-  combined.sort((a, b) => b.d - a.d);
-  combined.push({ n: '', d: 0 });
-  renderPlayerList(combined.map(p => p.n), combined.map(p => p.d));
-  autoAdjustCourts(combined.length - 1);
-  const inputs = document.querySelectorAll('#playerList .player-row .name-input');
-  const empty = [...inputs].find(i => !i.value);
-  if (empty) empty.focus();
-}
+
 
 function movePlayer(idx, dir) {
   const names = getPlayerNames(), duprs = getPlayerDuprs();
@@ -2187,42 +2173,6 @@ async function scanSignupSheet(event) {
   event.target.value = '';
 }
 
-let sessionSearchTimer = null;
-function onSessionDuprSearch() {
-  const val = document.getElementById('sessionDuprSearch').value.trim();
-  const box = document.getElementById('sessionDuprSuggestions');
-  if (val.length < 2) { box.style.display = 'none'; return; }
-  clearTimeout(sessionSearchTimer);
-  sessionSearchTimer = setTimeout(async () => {
-    try {
-      const res = await fetch(DUPR_PROXY + '/search?name=' + encodeURIComponent(val));
-      const data = await res.json();
-      if (!data.hits || !data.hits.length) { box.style.display = 'none'; return; }
-      box.style.display = 'block';
-      box.innerHTML = data.hits.map(h =>
-        `<div onclick="addFromDupr('${h.name.replace(/'/g,"\\'")}',${h.dupr})" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #1a1a2e;font-size:13px" onmouseover="this.style.background='#16213e'" onmouseout="this.style.background=''">` +
-        `<span style="color:#eee">${h.name}</span> <span style="color:#4ecca3;font-size:12px">${h.dupr ? h.dupr.toFixed(2) : 'NR'}</span></div>`
-      ).join('');
-    } catch (e) { box.style.display = 'none'; }
-  }, 400);
-}
-function addFromDupr(name, dupr) {
-  const names = getPlayerNames(), duprs = getPlayerDuprs();
-  names.push(name);
-  duprs.push(dupr);
-  // Auto-sort by rating descending
-  const combined = names.map((n, i) => ({ n, d: duprs[i] }));
-  combined.sort((a, b) => b.d - a.d);
-  combined.push({ n: '', d: 0 });
-  renderPlayerList(combined.map(p => p.n), combined.map(p => p.d));
-  autoAdjustCourts(combined.length - 1);
-  document.getElementById('sessionDuprSearch').value = '';
-  document.getElementById('sessionDuprSuggestions').style.display = 'none';
-  const inputs = document.querySelectorAll('#playerList .player-row .name-input');
-  const empty = [...inputs].find(i => !i.value);
-  if (empty) empty.focus();
-}
-
 function addTypedPlayer() {
   const input = document.getElementById('sessionDuprSearch');
   const name = input.value.trim();
@@ -2232,7 +2182,6 @@ function addTypedPlayer() {
   duprs.push(0);
   renderPlayerList(names, duprs);
   input.value = '';
-  document.getElementById('sessionDuprSuggestions').style.display = 'none';
 }
 
 function sortByDupr() {
