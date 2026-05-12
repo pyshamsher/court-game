@@ -1734,29 +1734,27 @@ function render() {
   });
   document.getElementById('courts').innerHTML = html;
 
-  // Show bye players
+  // Show bye players — prominent display
   if (state.bye && state.bye.length) {
-    document.getElementById('courts').innerHTML += `<div style="text-align:center;padding:12px;margin-top:8px;background:#0f3460;border-radius:8px;font-size:16px;color:#aaa">⏸ Sitting out: ${state.bye.join(', ')}</div>`;
+    document.getElementById('courts').innerHTML = `<div style="text-align:center;padding:14px;margin-bottom:12px;background:rgba(233,69,96,0.1);border:1px solid #e94560;border-radius:10px;font-size:16px;color:#e94560;font-weight:600">⏸ Sitting out: ${state.bye.join(', ')}</div>` + document.getElementById('courts').innerHTML;
   }
 
-  // Show standings for non-classic formats
+  // Show standings for non-classic formats (collapsible)
   if (state.gameFormat && state.gameFormat !== 'classic' && state.gameFormat !== 'dupr') {
+    let standingsContent = '';
     if (state.gameFormat === 'fixed' && state.teams && state.teams.some(t => t.wins || t.losses)) {
       const sorted = [...state.teams].sort((a, b) => (b.wins - b.losses) - (a.wins - a.losses) || b.wins - a.wins);
-      let standingsHtml = '<div style="background:#0f3460;border-radius:8px;padding:12px;margin-top:12px"><h3 style="color:#e94560;margin:0 0 8px;font-size:14px">📊 Team Standings</h3>';
       sorted.forEach((t, i) => {
-        standingsHtml += `<div style="display:flex;justify-content:space-between;padding:3px 8px;font-size:13px"><span>${i+1}. ${t.players.map(p=>p.name).join(' & ')}</span><span style="color:#4ecca3">${t.wins}W-${t.losses}L</span></div>`;
+        standingsContent += `<div style="display:flex;justify-content:space-between;padding:3px 8px;font-size:13px"><span>${i+1}. ${t.players.map(p=>p.name).join(' & ')}</span><span style="color:#4ecca3">${t.wins}W-${t.losses}L</span></div>`;
       });
-      standingsHtml += '</div>';
-      document.getElementById('courts').innerHTML += standingsHtml;
     } else if (state.players.some(p => p.wins || p.losses)) {
       const sorted = [...state.players].sort((a, b) => (b.wins - b.losses) - (a.wins - a.losses) || b.wins - a.wins);
-      let standingsHtml = '<div style="background:#0f3460;border-radius:8px;padding:12px;margin-top:12px"><h3 style="color:#e94560;margin:0 0 8px;font-size:14px">📊 Standings</h3>';
       sorted.forEach((p, i) => {
-        standingsHtml += `<div style="display:flex;justify-content:space-between;padding:3px 8px;font-size:13px"><span>${i+1}. ${p.name}</span><span style="color:#4ecca3">${p.wins}W-${p.losses}L</span></div>`;
+        standingsContent += `<div style="display:flex;justify-content:space-between;padding:3px 8px;font-size:13px"><span>${i+1}. ${p.name}</span><span style="color:#4ecca3">${p.wins}W-${p.losses}L</span></div>`;
       });
-      standingsHtml += '</div>';
-      document.getElementById('courts').innerHTML += standingsHtml;
+    }
+    if (standingsContent) {
+      document.getElementById('courts').innerHTML += `<div style="background:#0f3460;border-radius:8px;padding:12px;margin-top:12px"><h3 onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'" style="color:#e94560;margin:0;font-size:14px;cursor:pointer">📊 Standings ▾</h3><div style="display:none">${standingsContent}</div></div>`;
     }
     // Mix & Match progress
     if (state.gameFormat === 'mixmatch' && state.opponentPairs) {
@@ -2071,11 +2069,11 @@ function resolveRound() {
 
 function renderHistory() {
   if (!state.history.length) { document.getElementById('history').innerHTML = ''; return; }
-  let html = '<h2>History</h2>';
+  let entries = '';
   state.history.slice().reverse().forEach(h => {
-    html += `<div class="history-entry">${h}</div>`;
+    entries += `<div class="history-entry">${h}</div>`;
   });
-  document.getElementById('history').innerHTML = html;
+  document.getElementById('history').innerHTML = `<h2 onclick="document.getElementById('histEntries').style.display=document.getElementById('histEntries').style.display==='none'?'block':'none'" style="cursor:pointer">History ▾</h2><div id="histEntries" style="display:none">${entries}</div>`;
 }
 
 function getPlayerNames() {
