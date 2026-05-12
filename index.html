@@ -274,6 +274,8 @@
     <button onclick="resetGame()" style="font-size:12px">Reset</button>
     <button onclick="switchSession()" style="background:#0f3460;font-size:12px">🔑 Switch Session</button>
     <button onclick="toggleSwapMode()" style="background:#0f3460;font-size:12px">🔀 Swap Players</button>
+    <button onclick="addPlayerMidGame()" style="background:#4ecca3;color:#1a1a2e;font-size:12px">➕ Add Player</button>
+    <button onclick="removePlayerMidGame()" style="background:#e94560;font-size:12px">➖ Remove Player</button>
   </div>
   <div id="courts"></div>
   <div id="duprSummary"></div>
@@ -1391,6 +1393,47 @@ function generateMatchups(format) {
   }
 
   return courts;
+}
+
+function addPlayerMidGame() {
+  const name = prompt('Enter new player name:');
+  if (!name || !name.trim()) return;
+  const trimmed = name.trim();
+  if (state.players.some(p => p.name.toLowerCase() === trimmed.toLowerCase())) return alert('Player already in the game.');
+  state.players.push({ name: trimmed, seed: state.players.length + 1, consecLosses: 0, dupr: 0, wins: 0, losses: 0, byeCount: 0 });
+  // For fixed partners, add to a new team or leave unpaired until next regeneration
+  if (state.gameFormat === 'fixed' && state.teams) {
+    const unpaired = state.teams.find(t => t.players.length === 1);
+    if (unpaired) unpaired.players.push(state.players[state.players.length - 1]);
+    else state.teams.push({ players: [state.players[state.players.length - 1]], wins: 0, losses: 0 });
+  }
+  state.history.push(`<em>➕ ${trimmed} joined the session</em>`);
+  saveState();
+  render();
+}
+
+function removePlayerMidGame() {
+  const names = state.players.map(p => p.name);
+  const name = prompt('Remove which player?\n\n' + names.map((n, i) => (i+1) + '. ' + n).join('\n'));
+  if (!name) return;
+  // Accept number or name
+  let idx = parseInt(name) - 1;
+  if (isNaN(idx) || idx < 0 || idx >= names.length) {
+    idx = names.findIndex(n => n.toLowerCase() === name.trim().toLowerCase());
+  }
+  if (idx < 0 || idx >= state.players.length) return alert('Player not found.');
+  const removed = state.players[idx].name;
+  if (!confirm('Remove ' + removed + ' from the game?')) return;
+  state.players.splice(idx, 1);
+  // Remove from bye list
+  if (state.bye) state.bye = state.bye.filter(n => n !== removed);
+  // Remove from fixed teams
+  if (state.gameFormat === 'fixed' && state.teams) {
+    state.teams = state.teams.map(t => ({ ...t, players: t.players.filter(p => p.name !== removed) })).filter(t => t.players.length > 0);
+  }
+  state.history.push(`<em>➖ ${removed} left the session</em>`);
+  saveState();
+  render();
 }
 
 function resetGame() {
