@@ -1856,13 +1856,11 @@ function clearResult(courtIdx) {
 
 function undoRound() {
   if (!state.prevState) {
-    // No previous round — offer to go back to setup
-    if (!confirm('Go back to the starting screen?')) return;
-    state = { players: [], round: 1, history: [], pendingResults: {}, prevState: null };
-    db.remove();
-    document.getElementById('setup').style.display = 'block';
-    document.getElementById('game').style.display = 'none';
-    document.getElementById('history').innerHTML = '';
+    // Round 1 with no previous state — just clear pending results
+    if (!Object.keys(state.pendingResults || {}).length) return; // nothing to undo
+    state.pendingResults = {};
+    saveState();
+    render();
     return;
   }
   if (!confirm('Undo last round?')) return;
