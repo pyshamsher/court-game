@@ -223,10 +223,6 @@
     <label>Players:</label>
     <div id="playerList" style="margin-bottom:12px"></div>
     <div id="sessionScanStatus" style="font-size:12px;color:#aaa;margin-bottom:8px"></div>
-    <div style="position:relative;margin-bottom:8px">
-      <input type="text" id="sessionDuprSearch" placeholder="Type player name..." oninput="" onkeydown="if(event.key==='Enter')addTypedPlayer()" style="width:100%;padding:8px;border-radius:8px;border:none;background:#0f3460;color:#eee;font-size:13px">
-
-    </div>
     <button onclick="sortByDupr()" style="background:#0f3460;margin-bottom:8px">📊 Sort by DUPR</button>
     <button onclick="showDuprLogin()" style="background:#0f3460;margin-bottom:8px">🔍 Fetch DUPR Ratings</button>
     <div id="duprModal" style="display:none;background:#0f3460;padding:16px;border-radius:8px;margin-bottom:12px">
@@ -2273,17 +2269,6 @@ async function scanSignupSheet(event) {
     status.style.color = '#ff6b6b';
   }
   event.target.value = '';
-}
-
-function addTypedPlayer() {
-  const input = document.getElementById('sessionDuprSearch');
-  const name = input.value.trim();
-  if (!name) return;
-  const names = getPlayerNames(), duprs = getPlayerDuprs();
-  names.push(name);
-  duprs.push(0);
-  renderPlayerList(names, duprs);
-  input.value = '';
 }
 
 function sortByDupr() {
