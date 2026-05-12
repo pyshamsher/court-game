@@ -1484,10 +1484,11 @@ function endSession() {
 
 function getCourts() {
   if (state.matchups && state.matchups.length) return state.matchups;
+  const ppc = state.playersPerCourt || 4;
   const active = state.bye && state.bye.length ? state.players.filter(p => !state.bye.includes(p.name)) : state.players;
   const courts = [];
-  for (let i = 0; i < active.length; i += 4) {
-    courts.push(active.slice(i, i + 4));
+  for (let i = 0; i < active.length; i += ppc) {
+    courts.push(active.slice(i, i + ppc));
   }
   return courts;
 }
@@ -1701,8 +1702,8 @@ function render() {
         }
         html += `</div>`;
       });
-    } else {
-      // Non-DUPR: single game per court
+    } else if (court.length >= 4) {
+      // Non-DUPR: single game per court (teams: #1+#4 vs #2+#3)
       html += `<div class="matchups"><div class="match">`;
       const tA = [court[0], court[3]];
       const tB = [court[1], court[2]];
@@ -1726,6 +1727,9 @@ function render() {
         html += `<button onclick="clearResult(${ci})" style="background:#0f3460;margin-top:4px;font-size:12px">↩ Change</button>`;
       }
       html += `</div></div>`;
+    } else {
+      // Court with fewer than 4 players — just list them
+      html += `<div style="padding:8px;color:#aaa;font-size:13px">Players: ${court.map(p => p.name).join(', ')}</div>`;
     }
     html += `</div></div></div>`;
   });
