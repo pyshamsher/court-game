@@ -66,7 +66,7 @@
 </head>
 <body>
 
-<h1>🏓 <span>Pickle</span>Play</h1>
+<h1 id="appTitle">🏓 <span>Pickle</span>Play</h1>
 
 <div id="signupView" style="display:none;max-width:500px;margin:0 auto;text-align:center">
   <div style="background:#16213e;padding:24px;border-radius:12px">
@@ -1452,6 +1452,7 @@ function resetGame() {
   document.getElementById('setup').style.display = 'block';
   document.getElementById('game').style.display = 'none';
   document.getElementById('history').innerHTML = '';
+  document.getElementById('appTitle').innerHTML = '🏓 <span>Pickle</span>Play';
 }
 
 function endSession() {
@@ -1645,6 +1646,8 @@ function runTimer() {
 
 function render() {
   document.getElementById('roundNum').textContent = state.round;
+  const formatNames = {classic:'🏆 King of the Court',dupr:'📊 DUPR Recordable',roundrobin:'🔄 Round Robin',balancedrr:'⚖️ Balanced Round Robin',random:'🎲 Random Mix',mixmatch:'🔀 Mix & Match',ladder:'🪜 Ladder',elimination:'💀 Double Elimination',fixed:'🤝 Fixed Partners'};
+  document.getElementById('appTitle').innerHTML = formatNames[state.gameFormat] || '🏓 <span>Pickle</span>Play';
   if (state.sessionStart) {
     if (localTimerEnd && localTimerEnd > Date.now()) runTimer();
     else if (!localTimerEnd && document.getElementById('sessionTimer')) document.getElementById('sessionTimer').textContent = '⏱ Set Timer';
