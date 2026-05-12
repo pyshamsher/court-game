@@ -1856,11 +1856,17 @@ function clearResult(courtIdx) {
 
 function undoRound() {
   if (!state.prevState) {
-    // Round 1 with no previous state — just clear pending results
-    if (!Object.keys(state.pendingResults || {}).length) return; // nothing to undo
-    state.pendingResults = {};
-    saveState();
-    render();
+    // Round 1: if pending results, clear them. Otherwise go back to setup.
+    if (Object.keys(state.pendingResults || {}).length) {
+      state.pendingResults = {};
+      saveState();
+      render();
+      return;
+    }
+    if (!confirm('Go back to player setup?')) return;
+    document.getElementById('setup').style.display = 'block';
+    document.getElementById('game').style.display = 'none';
+    document.getElementById('appTitle').innerHTML = '🏓 <span>Pickle</span>Play';
     return;
   }
   if (!confirm('Undo last round?')) return;
