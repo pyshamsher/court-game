@@ -1864,6 +1864,10 @@ function undoRound() {
       return;
     }
     if (!confirm('Go back to player setup?')) return;
+    // Populate setup with current players
+    const names = state.players.map(p => p.name);
+    const duprs = state.players.map(p => p.dupr || 0);
+    renderPlayerList(names, duprs);
     document.getElementById('setup').style.display = 'block';
     document.getElementById('game').style.display = 'none';
     document.getElementById('appTitle').innerHTML = '🏓 <span>Pickle</span>Play';
