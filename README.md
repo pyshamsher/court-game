@@ -1,16 +1,15 @@
 # Pickleball Court Tracker
 
 ## Live Site
-https://pickleball-tracker.surge.sh
+https://pickleplay.pages.dev
 
 ## Passcode
 `pickle2026`
 
 ## Deploy Changes
 ```bash
-npx surge ~/court-game pickleball-tracker.surge.sh
+npx wrangler pages deploy ~/court-game --project-name=pickleplay
 ```
-Surge account: mr.shamshersingh@gmail.com
 
 ## Firebase
 - Project: pickleball-tracker-2ce69
