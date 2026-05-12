@@ -186,7 +186,6 @@
           <option value="balancedrr">⚖️ Balanced Round Robin</option>
           <option value="random">🎲 Random Mix</option>
           <option value="ladder">🪜 Ladder</option>
-          <option value="swiss">🧩 Swiss</option>
           <option value="elimination">💀 Double Elimination</option>
           <option value="fixed">🤝 Fixed Partners</option>
         </select>
@@ -240,7 +239,6 @@
         <option value="balancedrr">⚖️ Balanced Round Robin (by rating)</option>
         <option value="random">🎲 Random Mix</option>
         <option value="ladder">🪜 Ladder</option>
-        <option value="swiss">🧩 Swiss (match by record)</option>
         <option value="elimination">💀 Double Elimination</option>
         <option value="fixed">🤝 Fixed Partners</option>
       </select>
@@ -1066,7 +1064,6 @@ const FORMAT_INFO = {
   balancedrr: '<strong>⚖️ Balanced Round Robin</strong><br><br><strong>How it works:</strong><br>1. Players grouped by rating (strongest with weakest via snake draft)<br>2. Creates balanced, competitive matchups each round<br>3. Live standings track individual wins/losses<br>4. Odd players sit out (bye rotates fairly)<br><br><strong>Best for:</strong> Groups with mixed skill levels. Ensures fair games.',
   random: '<strong>🎲 Random Mix</strong><br><br><strong>How it works:</strong><br>1. All players shuffled completely randomly each round<br>2. New partners and opponents every game<br>3. No seeding, no strategy — pure fun<br>4. Standings track individual wins/losses<br>5. Odd players sit out (bye rotates fairly)<br><br><strong>Best for:</strong> Social play where you want to mix with everyone.',
   ladder: '<strong>🪜 Ladder</strong><br><br><strong>How it works:</strong><br>1. Players ranked by rating/record<br>2. Adjacent players on the ladder play each other<br>3. Win = move up the ladder, lose = move down<br>4. Ladder reorders after each round based on cumulative record<br>5. Odd players sit out (bye rotates fairly)<br><br><strong>Goal:</strong> Climb to the top of the ladder and stay there.',
-  swiss: '<strong>🧩 Swiss</strong><br><br><strong>How it works:</strong><br>1. Round 1: random matchups (everyone is 0-0)<br>2. After each round, players grouped by similar win/loss record<br>3. Winners play winners, losers play losers<br>4. After a few rounds, naturally finds the strongest players<br>5. Everyone keeps playing — no elimination<br>6. Odd players sit out (bye rotates fairly)<br><br><strong>Best for:</strong> Larger groups where full round robin would take too long.',
   elimination: '<strong>💀 Double Elimination</strong><br><br><strong>How it works:</strong><br>1. Everyone starts in the winners bracket<br>2. First loss → sent to losers bracket<br>3. Second loss → eliminated<br>4. Players seeded by rating<br>5. Gives everyone a second chance<br>6. Odd players sit out (bye rotates fairly)<br><br><strong>Best for:</strong> Tournament-style play with fixed partners. Finds a true champion.',
   fixed: '<strong>🤝 Fixed Partners</strong><br><br><strong>How it works:</strong><br>1. Players paired in list order: #1+#2, #3+#4, #5+#6, etc.<br>2. Each round, teams face different opponents (no repeat matchups until all played)<br>3. Same partners the entire session<br>4. Team Standings shown (Team wins/losses, not individual)<br>5. Odd number of teams → one team sits out (bye rotates)<br><br><strong>Tip:</strong> Sort players by rating before starting so pairs are balanced (best + worst together): #1+#8, #2+#7, etc.'
 };
@@ -1291,9 +1288,6 @@ function generateMatchups(format) {
     for (let i = 0; i < jittered.length; i += ppc) courts.push(jittered.slice(i, i + ppc));
   } else if (format === 'balancedrr') {
     const sorted = [...active].sort((a, b) => (b.dupr || 0) - (a.dupr || 0));
-    for (let i = 0; i < sorted.length; i += ppc) courts.push(sorted.slice(i, i + ppc));
-  } else if (format === 'swiss') {
-    const sorted = [...active].sort((a, b) => (b.wins - b.losses) - (a.wins - a.losses) || Math.random() - 0.5);
     for (let i = 0; i < sorted.length; i += ppc) courts.push(sorted.slice(i, i + ppc));
   } else if (format === 'ladder') {
     const sorted = [...active].sort((a, b) => (b.wins - b.losses) - (a.wins - a.losses) || (b.dupr || 0) - (a.dupr || 0));
