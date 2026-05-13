@@ -1893,6 +1893,7 @@ function render() {
         html += `<input type="number" id="scoreA_${ci}" min="0" max="21" style="width:44px;padding:5px;border-radius:6px;border:none;background:#16213e;color:#4ecca3;font-size:14px;text-align:center" placeholder="-">`;
         html += `<span style="color:#aaa;font-size:12px">–</span>`;
         html += `<input type="number" id="scoreB_${ci}" min="0" max="21" style="width:44px;padding:5px;border-radius:6px;border:none;background:#16213e;color:#e94560;font-size:14px;text-align:center" placeholder="-">`;
+        html += `<button onclick="recordResultWithScore(${ci})" style="margin:0;padding:5px 10px;font-size:12px">✅</button>`;
         html += `</div>`;
         html += `<div style="display:flex;gap:8px"><button onclick="recordResultWithScore(${ci},'A')" style="flex:1">🏆 Top</button>`;
         html += `<button onclick="recordResultWithScore(${ci},'B')" style="flex:1;background:#0f3460">🏆 Bottom</button></div>`;
@@ -2021,9 +2022,12 @@ function recordResultWithScore(courtIdx, winner) {
   const a = parseInt(document.getElementById('scoreA_' + courtIdx).value);
   const b = parseInt(document.getElementById('scoreB_' + courtIdx).value);
   if (!isNaN(a) && !isNaN(b) && a >= 0 && b >= 0) {
-    state.pendingResults[courtIdx] = { winner, scoreA: a, scoreB: b };
-  } else {
+    if (a === b) return alert('Scores can\'t be tied.');
+    state.pendingResults[courtIdx] = { winner: a > b ? 'A' : 'B', scoreA: a, scoreB: b };
+  } else if (winner) {
     state.pendingResults[courtIdx] = winner;
+  } else {
+    return alert('Enter scores or tap a winner.');
   }
   saveState();
   render();
