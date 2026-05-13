@@ -1406,6 +1406,26 @@ function addPlayerMidGame() {
     else state.teams.push({ players: [state.players[state.players.length - 1]], wins: 0, losses: 0 });
   }
   state.history.push(`<em>➕ ${trimmed} joined the session</em>`);
+  // Regenerate matchups with new player count
+  if (state.gameFormat && state.gameFormat !== 'classic') {
+    state.matchups = generateMatchups(state.gameFormat);
+  } else {
+    // Classic: recalculate bye
+    const sitOut = state.players.length % 4;
+    if (sitOut > 0) {
+      const lastBye = new Set(state.bye || []);
+      const sorted = [...state.players].sort((a, b) => {
+        if (lastBye.has(a.name) !== lastBye.has(b.name)) return lastBye.has(a.name) ? -1 : 1;
+        return (a.byeCount || 0) - (b.byeCount || 0) || Math.random() - 0.5;
+      });
+      state.bye = sorted.slice(sorted.length - sitOut).map(p => p.name);
+      sorted.slice(sorted.length - sitOut).forEach(p => { p.byeCount = (p.byeCount || 0) + 1; });
+      state.players = sorted;
+    } else {
+      state.bye = [];
+    }
+    state.matchups = null;
+  }
   saveState();
   render();
 }
@@ -1430,6 +1450,25 @@ function removePlayerMidGame() {
     state.teams = state.teams.map(t => ({ ...t, players: t.players.filter(p => p.name !== removed) })).filter(t => t.players.length > 0);
   }
   state.history.push(`<em>➖ ${removed} left the session</em>`);
+  // Regenerate matchups with updated player count
+  if (state.gameFormat && state.gameFormat !== 'classic') {
+    state.matchups = generateMatchups(state.gameFormat);
+  } else {
+    const sitOut = state.players.length % 4;
+    if (sitOut > 0) {
+      const lastBye = new Set(state.bye || []);
+      const sorted = [...state.players].sort((a, b) => {
+        if (lastBye.has(a.name) !== lastBye.has(b.name)) return lastBye.has(a.name) ? -1 : 1;
+        return (a.byeCount || 0) - (b.byeCount || 0) || Math.random() - 0.5;
+      });
+      state.bye = sorted.slice(sorted.length - sitOut).map(p => p.name);
+      sorted.slice(sorted.length - sitOut).forEach(p => { p.byeCount = (p.byeCount || 0) + 1; });
+      state.players = sorted;
+    } else {
+      state.bye = [];
+    }
+    state.matchups = null;
+  }
   saveState();
   render();
 }
