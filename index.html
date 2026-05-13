@@ -1889,8 +1889,13 @@ function render() {
       html += `</span></div>`;
       const allResolved = state.pendingResults[ci] !== undefined;
       if (!allResolved) {
-        html += `<div style="display:flex;gap:8px;margin-top:8px"><button onclick="recordResult(${ci},'A')" style="flex:1">🏆 Top</button>`;
-        html += `<button onclick="recordResult(${ci},'B')" style="flex:1;background:#0f3460">🏆 Bottom</button></div>`;
+        html += `<div style="display:flex;align-items:center;justify-content:center;gap:6px;margin:8px 0">`;
+        html += `<input type="number" id="scoreA_${ci}" min="0" max="21" style="width:44px;padding:5px;border-radius:6px;border:none;background:#16213e;color:#4ecca3;font-size:14px;text-align:center" placeholder="-">`;
+        html += `<span style="color:#aaa;font-size:12px">–</span>`;
+        html += `<input type="number" id="scoreB_${ci}" min="0" max="21" style="width:44px;padding:5px;border-radius:6px;border:none;background:#16213e;color:#e94560;font-size:14px;text-align:center" placeholder="-">`;
+        html += `</div>`;
+        html += `<div style="display:flex;gap:8px"><button onclick="recordResultWithScore(${ci},'A')" style="flex:1">🏆 Top</button>`;
+        html += `<button onclick="recordResultWithScore(${ci},'B')" style="flex:1;background:#0f3460">🏆 Bottom</button></div>`;
       } else {
         const r = state.pendingResults[ci];
         const isObj = typeof r === 'object';
@@ -2008,6 +2013,18 @@ function recordDuprScore(gameKey) {
   if (isNaN(a) || isNaN(b) || a < 0 || b < 0) return alert('Enter valid scores.');
   if (a === b) return alert('Scores can\'t be tied.');
   state.pendingResults[gameKey] = { winner: a > b ? 'A' : 'B', scoreA: a, scoreB: b };
+  saveState();
+  render();
+}
+
+function recordResultWithScore(courtIdx, winner) {
+  const a = parseInt(document.getElementById('scoreA_' + courtIdx).value);
+  const b = parseInt(document.getElementById('scoreB_' + courtIdx).value);
+  if (!isNaN(a) && !isNaN(b) && a >= 0 && b >= 0) {
+    state.pendingResults[courtIdx] = { winner, scoreA: a, scoreB: b };
+  } else {
+    state.pendingResults[courtIdx] = winner;
+  }
   saveState();
   render();
 }
