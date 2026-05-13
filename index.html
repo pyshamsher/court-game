@@ -1646,11 +1646,19 @@ function swapPlayer(idx) {
 
 function doSwap(a, b) {
   const pA = state.players[a], pB = state.players[b];
-  const courtA = Math.floor(a / 4), courtB = Math.floor(b / 4);
   [state.players[a], state.players[b]] = [state.players[b], state.players[a]];
-  if (courtA !== courtB) { state.players[a].consecLosses = 0; state.players[b].consecLosses = 0; }
-  state.history.push(`<em>🔀 Manual swap: ${pA.name} ↔ ${pB.name}${courtA !== courtB ? ' (loss counters reset)' : ''}</em>`);
+  // Also swap in matchups if they exist
+  if (state.matchups && state.matchups.length) {
+    for (const court of state.matchups) {
+      const idxA = court.findIndex(p => p.name === pA.name);
+      const idxB = court.findIndex(p => p.name === pB.name);
+      if (idxA >= 0) court[idxA] = pB;
+      if (idxB >= 0) court[idxB] = pA;
+    }
+  }
+  state.history.push(`<em>🔀 Swap: ${pA.name} ↔ ${pB.name}</em>`);
   swapMode = false; swapFirst = null;
+  state.pendingResults = {};
   saveState();
   render();
 }
