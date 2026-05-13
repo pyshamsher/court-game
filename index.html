@@ -1612,10 +1612,26 @@ function toggleMoreActions() {
 
 let swapMode = false, swapFirst = null;
 
-function toggleSwapMode() {
-  swapMode = !swapMode;
+function tapSwap(idx) {
+  if (swapFirst === null) { swapFirst = idx; render(); return; }
+  if (swapFirst === idx) { swapFirst = null; render(); return; }
+  doSwap(swapFirst, idx);
   swapFirst = null;
-  render();
+}
+
+function toggleSwapMode() {
+  // Offer quick prompt swap or tap mode
+  const names = state.players.map(p => p.name);
+  const bye = state.bye || [];
+  const active = names.filter(n => !bye.includes(n));
+  const choice = prompt('Swap players — enter two numbers:\n\n' + active.map((n, i) => (i+1) + '. ' + n).join('\n') + '\n\nExample: "1 3" swaps player 1 and 3');
+  if (!choice) return;
+  const parts = choice.trim().split(/[\s,]+/).map(Number);
+  if (parts.length !== 2 || parts.some(n => isNaN(n) || n < 1 || n > active.length)) return alert('Enter two valid numbers.');
+  const idxA = state.players.findIndex(p => p.name === active[parts[0] - 1]);
+  const idxB = state.players.findIndex(p => p.name === active[parts[1] - 1]);
+  if (idxA < 0 || idxB < 0 || idxA === idxB) return;
+  doSwap(idxA, idxB);
 }
 
 function swapPlayer(idx) {
@@ -1771,7 +1787,7 @@ function render() {
   const courts = getCourts();
   const numCourts = courts.length;
   let html = '';
-  if (swapMode) html += `<div class="swap-bar">${swapFirst !== null ? '👆 Now tap the second player to swap with <strong>' + state.players[swapFirst].name + '</strong>' : '👆 Tap a player to select, then tap another to swap'}</div>`;
+  if (swapMode || swapFirst !== null) html += `<div class="swap-bar">${swapFirst !== null ? '👆 Tap another player to swap with <strong>' + state.players[swapFirst].name + '</strong> <span onclick="swapFirst=null;render()" style="cursor:pointer;margin-left:8px">✕ cancel</span>' : '👆 Tap a player to select, then tap another to swap'}</div>`;
   courts.forEach((court, ci) => {
     const cl = (state.courtLabels && state.courtLabels[ci]) || ci + 1;
     html += `<div class="court"><h2>Court ${cl}</h2>`;
@@ -1822,11 +1838,11 @@ function render() {
       const tA = [court[0], court[3]];
       const tB = [court[1], court[2]];
       html += `<div class="team"><span class="name">`;
-      html += swapMode ? tA.map((p, ti) => { const gi = ci*4+([0,3][ti]); const sel = swapFirst===gi?' swap-sel':''; return `<span class="player${sel} swap-mode" onclick="swapPlayer(${gi})">${p.name}${fmtDupr(p)}</span>`; }).join(' & ') : `${tA[0].name}${fmtDupr(tA[0])} & ${tA[1].name}${fmtDupr(tA[1])}`;
+      html += swapMode ? tA.map((p, ti) => { const gi = ci*4+([0,3][ti]); const sel = swapFirst===gi?' swap-sel':''; return `<span class="player${sel} swap-mode" onclick="swapPlayer(${gi})">${p.name}${fmtDupr(p)}</span>`; }).join(' & ') : tA.map((p, ti) => { const gi = ci*4+([0,3][ti]); const sel = swapFirst===gi?' style="cursor:pointer;background:#f7d716;color:#1a1a2e;padding:2px 6px;border-radius:4px"':' style="cursor:pointer"'; return `<span onclick="tapSwap(${gi})"${sel}>${p.name}${fmtDupr(p)}</span>`; }).join(' & ');
       html += `</span></div>`;
       html += `<div class="vs">VS</div>`;
       html += `<div class="team"><span class="name">`;
-      html += swapMode ? tB.map((p, ti) => { const gi = ci*4+([1,2][ti]); const sel = swapFirst===gi?' swap-sel':''; return `<span class="player${sel} swap-mode" onclick="swapPlayer(${gi})">${p.name}${fmtDupr(p)}</span>`; }).join(' & ') : `${tB[0].name}${fmtDupr(tB[0])} & ${tB[1].name}${fmtDupr(tB[1])}`;
+      html += swapMode ? tB.map((p, ti) => { const gi = ci*4+([1,2][ti]); const sel = swapFirst===gi?' swap-sel':''; return `<span class="player${sel} swap-mode" onclick="swapPlayer(${gi})">${p.name}${fmtDupr(p)}</span>`; }).join(' & ') : tB.map((p, ti) => { const gi = ci*4+([1,2][ti]); const sel = swapFirst===gi?' style="cursor:pointer;background:#f7d716;color:#1a1a2e;padding:2px 6px;border-radius:4px"':' style="cursor:pointer"'; return `<span onclick="tapSwap(${gi})"${sel}>${p.name}${fmtDupr(p)}</span>`; }).join(' & ');
       html += `</span></div>`;
       const allResolved = state.pendingResults[ci] !== undefined;
       if (!allResolved) {
