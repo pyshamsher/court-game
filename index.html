@@ -273,6 +273,7 @@
     <button onclick="toggleSwapMode()" style="background:#0f3460;font-size:12px">🔀 Swap Players</button>
     <button onclick="addPlayerMidGame()" style="background:#4ecca3;color:#1a1a2e;font-size:12px">➕ Add Player</button>
     <button onclick="removePlayerMidGame()" style="background:#e94560;font-size:12px">➖ Remove Player</button>
+    <button onclick="changeFormatMidGame()" style="background:#0f3460;font-size:12px">🔄 Change Format</button>
   </div>
   <div id="courts"></div>
   <div id="duprSummary"></div>
@@ -1391,6 +1392,40 @@ function generateMatchups(format) {
   }
 
   return courts;
+}
+
+function changeFormatMidGame() {
+  const formats = {classic:'🏆 King of the Court',dupr:'📊 DUPR Recordable',roundrobin:'🔄 Round Robin',balancedrr:'⚖️ Balanced Round Robin',random:'🎲 Random Mix',mixmatch:'🔀 Mix & Match',ladder:'🪜 Ladder',elimination:'💀 Double Elimination',fixed:'🤝 Fixed Partners'};
+  const keys = Object.keys(formats);
+  const choice = prompt('Switch to which format?\n\n' + keys.map((k, i) => (i+1) + '. ' + formats[k] + (k === state.gameFormat ? ' (current)' : '')).join('\n'));
+  if (!choice) return;
+  const idx = parseInt(choice) - 1;
+  if (isNaN(idx) || idx < 0 || idx >= keys.length) return alert('Invalid choice.');
+  const newFormat = keys[idx];
+  if (newFormat === state.gameFormat) return;
+  state.gameFormat = newFormat;
+  state.duprMode = (newFormat === 'dupr');
+  state.pendingResults = {};
+  state.matchups = null;
+  state.teams = null;
+  if (newFormat !== 'classic') {
+    state.matchups = generateMatchups(newFormat);
+  } else {
+    const sitOut = state.players.length % 4;
+    if (sitOut > 0) {
+      const lastBye = new Set(state.bye || []);
+      const sorted = [...state.players].sort((a, b) => {
+        if (lastBye.has(a.name) !== lastBye.has(b.name)) return lastBye.has(a.name) ? -1 : 1;
+        return (a.byeCount || 0) - (b.byeCount || 0) || Math.random() - 0.5;
+      });
+      state.bye = sorted.slice(sorted.length - sitOut).map(p => p.name);
+      sorted.slice(sorted.length - sitOut).forEach(p => { p.byeCount = (p.byeCount || 0) + 1; });
+      state.players = sorted;
+    } else { state.bye = []; }
+  }
+  state.history.push(`<em>🔄 Format changed to ${formats[newFormat]}</em>`);
+  saveState();
+  render();
 }
 
 function changeBye() {
