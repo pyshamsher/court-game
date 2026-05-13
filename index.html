@@ -1434,6 +1434,10 @@ function addPlayerMidGame() {
     else state.teams.push({ players: [state.players[state.players.length - 1]], wins: 0, losses: 0 });
   }
   state.history.push(`<em>➕ ${trimmed} joined the session</em>`);
+  // Auto-adjust court count
+  const ppc = state.playersPerCourt || 4;
+  const newCourts = Math.max(1, Math.floor(state.players.length / ppc));
+  state.courtLabels = Array.from({length: newCourts}, (_, i) => i + 1);
   // Regenerate matchups with new player count
   if (state.gameFormat && state.gameFormat !== 'classic') {
     state.matchups = generateMatchups(state.gameFormat);
@@ -1478,6 +1482,10 @@ function removePlayerMidGame() {
     state.teams = state.teams.map(t => ({ ...t, players: t.players.filter(p => p.name !== removed) })).filter(t => t.players.length > 0);
   }
   state.history.push(`<em>➖ ${removed} left the session</em>`);
+  // Auto-adjust court count
+  const ppc = state.playersPerCourt || 4;
+  const newCourts = Math.max(1, Math.floor(state.players.length / ppc));
+  state.courtLabels = Array.from({length: newCourts}, (_, i) => i + 1);
   // Regenerate matchups with updated player count
   if (state.gameFormat && state.gameFormat !== 'classic') {
     state.matchups = generateMatchups(state.gameFormat);
