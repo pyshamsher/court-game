@@ -1393,6 +1393,34 @@ function generateMatchups(format) {
   return courts;
 }
 
+function changeBye() {
+  const numBye = (state.bye || []).length;
+  if (!numBye) return;
+  const names = state.players.map(p => p.name);
+  const choice = prompt('Who should sit out?\n\n' + names.map((n, i) => (i+1) + '. ' + n + (state.bye.includes(n) ? ' (current)' : '')).join('\n'));
+  if (!choice) return;
+  let idx = parseInt(choice) - 1;
+  if (isNaN(idx) || idx < 0 || idx >= names.length) {
+    idx = names.findIndex(n => n.toLowerCase() === choice.trim().toLowerCase());
+  }
+  if (idx < 0 || idx >= state.players.length) return alert('Player not found.');
+  const newBye = state.players[idx].name;
+  if (state.bye.includes(newBye)) return;
+  // Set new bye
+  state.bye = [newBye];
+  state.players[idx].byeCount = (state.players[idx].byeCount || 0) + 1;
+  // Rebuild courts from active players
+  const ppc = state.playersPerCourt || 4;
+  const active = state.players.filter(p => !state.bye.includes(p.name));
+  const courts = [];
+  const shuffled = [...active].sort(() => Math.random() - 0.5);
+  for (let i = 0; i < shuffled.length; i += ppc) courts.push(shuffled.slice(i, i + ppc));
+  state.matchups = courts;
+  state.pendingResults = {};
+  saveState();
+  render();
+}
+
 function addPlayerMidGame() {
   const name = prompt('Enter new player name:');
   if (!name || !name.trim()) return;
@@ -1780,7 +1808,7 @@ function render() {
 
   // Show bye players — prominent display at top
   if (state.bye && state.bye.length) {
-    const byeHtml = `<div style="text-align:center;padding:16px;margin-bottom:14px;background:rgba(233,69,96,0.15);border:2px solid #e94560;border-radius:12px;font-size:18px;color:#e94560;font-weight:700">⏸ Sitting out this round: ${state.bye.join(', ')}</div>`;
+    const byeHtml = `<div style="text-align:center;padding:16px;margin-bottom:14px;background:rgba(233,69,96,0.15);border:2px solid #e94560;border-radius:12px;font-size:18px;color:#e94560;font-weight:700">⏸ Sitting out this round: ${state.bye.join(', ')} <button onclick="changeBye()" style="margin-left:10px;padding:4px 12px;font-size:12px;background:#e94560;vertical-align:middle">Change</button></div>`;
     document.getElementById('courts').innerHTML = byeHtml + document.getElementById('courts').innerHTML;
   }
 
