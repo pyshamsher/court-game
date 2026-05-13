@@ -244,6 +244,15 @@
       <button onclick="showFormatInfo()" style="margin:0;padding:10px 12px;background:#0f3460;font-size:13px">ℹ️</button>
     </div>
     <div id="formatInfo" style="display:none;background:#0f3460;padding:12px;border-radius:8px;margin-bottom:10px;font-size:12px;color:#ccc;line-height:1.6"></div>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
+      <label style="font-size:13px;color:#aaa;margin:0">Pairing:</label>
+      <select id="pairingMode" style="flex:1;padding:8px;border-radius:8px;border:none;background:#0f3460;color:#eee;font-size:13px">
+        <option value="any">Any (no gender rules)</option>
+        <option value="mixed">Mixed Doubles (1M + 1F per team)</option>
+        <option value="mens">Mens Doubles (M only)</option>
+        <option value="womens">Womens Doubles (F only)</option>
+      </select>
+    </div>
     <button onclick="startGame()" style="width:100%;margin:10px 0">▶ Start Game</button>
     <button onclick="backToRooms()" style="background:#0f3460">← Groups</button>
     <button onclick="logout()" style="background:#0f3460">🚪 Logout</button>
@@ -1206,14 +1215,17 @@ function startGame(dupr) {
   document.getElementById('pastSessions').style.display = 'none';
   const names = getPlayerNames();
   const duprs = getPlayerDuprs();
+  const genders = getPlayerGenders();
   const courtLabels = getCourtNumbers();
   const numCourts = courtLabels.length;
   const format = document.getElementById('gameFormat').value;
+  const pairingMode = document.getElementById('pairingMode').value;
   const ppc = parseInt(document.getElementById('playersPerCourt').value) || 4;
   if (names.length < 4) return alert('Need at least 4 players.');
-  state.players = names.map((name, i) => ({ name, seed: i + 1, consecLosses: 0, dupr: duprs[i] || 0, wins: 0, losses: 0, byeCount: 0 }));
+  state.players = names.map((name, i) => ({ name, seed: i + 1, consecLosses: 0, dupr: duprs[i] || 0, wins: 0, losses: 0, byeCount: 0, gender: genders[i] || '' }));
   state.courtLabels = courtLabels;
   state.playersPerCourt = ppc;
+  state.pairingMode = pairingMode;
   state.gameFormat = format;
   state.duprMode = (format === 'dupr');
   state.startingDuprs = state.duprMode ? Object.fromEntries(names.map((name, i) => [name, duprs[i] || 0])) : null;
@@ -1389,6 +1401,26 @@ function generateMatchups(format) {
   } else {
     const shuffled = [...active].sort(() => Math.random() - 0.5);
     for (let i = 0; i < shuffled.length; i += ppc) courts.push(shuffled.slice(i, i + ppc));
+  }
+
+  // Apply pairing mode: rearrange players within each court so teams respect gender rules
+  // Teams are #0+#3 (Top) vs #1+#2 (Bottom)
+  const mode = state.pairingMode || 'any';
+  if (mode !== 'any') {
+    courts.forEach(court => {
+      if (court.length < 4) return;
+      const males = court.filter(p => p.gender === 'M');
+      const females = court.filter(p => p.gender === 'F');
+      if (mode === 'mixed' && males.length >= 2 && females.length >= 2) {
+        // Each team gets 1M + 1F: positions 0,3 = team A, positions 1,2 = team B
+        court[0] = males[0]; court[3] = females[0];
+        court[1] = males[1]; court[2] = females[1];
+      } else if (mode === 'mens' && males.length >= 4) {
+        court[0] = males[0]; court[1] = males[1]; court[2] = males[2]; court[3] = males[3];
+      } else if (mode === 'womens' && females.length >= 4) {
+        court[0] = females[0]; court[1] = females[1]; court[2] = females[2]; court[3] = females[3];
+      }
+    });
   }
 
   return courts;
@@ -2235,17 +2267,29 @@ function getPlayerDuprs() {
   return [...document.querySelectorAll('#playerList .player-row .dupr-input')].map(i => parseFloat(i.value) || 0);
 }
 
-function renderPlayerList(names, duprs) {
+function getPlayerGenders() {
+  return [...document.querySelectorAll('#playerList .player-row .gender-btn')].map(b => b.dataset.gender || '');
+}
+
+function renderPlayerList(names, duprs, genders) {
   duprs = duprs || [];
+  genders = genders || [];
   const list = document.getElementById('playerList');
   list.innerHTML = '';
   names.forEach((name, i) => {
+    const g = genders[i] || '';
     const row = document.createElement('div');
     row.className = 'player-row';
     row.style.position = 'relative';
-    row.innerHTML = `<span class="seed-label">${name ? i+1 : ''}.</span><button class="move-btn" onclick="movePlayer(${i},-1)">▲</button><button class="move-btn" onclick="movePlayer(${i},1)">▼</button><input class="name-input" value="${name || ''}" onkeydown="if(event.key==='Enter'){event.preventDefault();addNextPlayer(${i});}" placeholder="Type name..."><input class="dupr-input" value="${duprs[i] || ''}" placeholder="DUPR"><button class="move-btn" onclick="jumpPlayer(${i})" title="Move to position">#</button><button class="remove-btn" onclick="removePlayer(${i})">✕</button>`;
+    row.innerHTML = `<span class="seed-label">${name ? i+1 : ''}.</span><button class="move-btn" onclick="movePlayer(${i},-1)">▲</button><button class="move-btn" onclick="movePlayer(${i},1)">▼</button><input class="name-input" value="${name || ''}" onkeydown="if(event.key==='Enter'){event.preventDefault();addNextPlayer(${i});}" placeholder="Type name..."><input class="dupr-input" value="${duprs[i] || ''}" placeholder="DUPR"><button class="gender-btn" data-gender="${g}" onclick="toggleGender(${i})" style="margin:0;padding:2px 6px;font-size:11px;min-width:24px;background:${g==='M'?'#4a90d9':g==='F'?'#e94560':'#333'};border-radius:4px">${g || '?'}</button><button class="move-btn" onclick="jumpPlayer(${i})" title="Move to position">#</button><button class="remove-btn" onclick="removePlayer(${i})">✕</button>`;
     list.appendChild(row);
   });
+}
+
+function toggleGender(idx) {
+  const names = getPlayerNames(), duprs = getPlayerDuprs(), genders = getPlayerGenders();
+  genders[idx] = genders[idx] === 'M' ? 'F' : genders[idx] === 'F' ? '' : 'M';
+  renderPlayerList(names, duprs, genders);
 }
 
 function addNextPlayer(idx) {
