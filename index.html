@@ -1785,8 +1785,7 @@ function runTimer() {
 function render() {
   document.getElementById('roundNum').textContent = state.round;
   const formatNames = {classic:'🏆 King of the Court',dupr:'📊 DUPR Recordable',roundrobin:'🔄 Round Robin',balancedrr:'⚖️ Balanced Round Robin',random:'🎲 Random Mix',mixmatch:'🔀 Mix & Match',ladder:'🪜 Ladder',elimination:'💀 Double Elimination',fixed:'🤝 Fixed Partners'};
-  const formatDesc = {classic:'Winners stay, losers drop. #1+#4 vs #2+#3.',dupr:'Same as King of the Court but scores recorded for DUPR.',roundrobin:'Random teams each round. Everyone plays.',balancedrr:'Grouped by rating for fair matchups.',random:'Fully random shuffle every round.',mixmatch:'Guarantees you face every other player.',ladder:'Win = move up, lose = move down.',elimination:'Two losses and you\'re out.',fixed:'Same partner all session, rotate opponents.'};
-  document.getElementById('appTitle').innerHTML = (formatNames[state.gameFormat] || '🏓 <span>Pickle</span>Play') + `<div style="font-size:12px;font-weight:400;color:#888;margin-top:4px">${formatDesc[state.gameFormat] || ''}</div>`;
+  document.getElementById('appTitle').innerHTML = (formatNames[state.gameFormat] || '🏓 <span>Pickle</span>Play') + `<div onclick="var d=this.querySelector('div');d.style.display=d.style.display==='none'?'block':'none'" style="font-size:12px;font-weight:400;color:#4ecca3;margin-top:4px;cursor:pointer">ℹ️ How it works ▾<div style="display:none;text-align:left;color:#ccc;margin-top:8px;padding:10px;background:#0f3460;border-radius:8px;line-height:1.6">${FORMAT_INFO[state.gameFormat] || ''}</div></div>`;
   if (state.sessionStart) {
     if (localTimerEnd && localTimerEnd > Date.now()) runTimer();
     else if (!localTimerEnd && document.getElementById('sessionTimer')) document.getElementById('sessionTimer').textContent = '⏱ Set Timer';
