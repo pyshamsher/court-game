@@ -2391,11 +2391,20 @@ async function scanScreenshotForPlayers(event) {
   try {
     const { data } = await Tesseract.recognize(file, 'eng');
     const lines = data.text.split('\n').map(l => l.trim()).filter(l => l.length > 2 && /[a-zA-Z]/.test(l));
-    const names = lines.map(l => l.replace(/^[\d.\-)\]]+\s*/, '').replace(/[^a-zA-Z\s'-]/g, '').trim())
-      .filter(n => {
-        const words = n.split(/\s+/);
-        return words.length >= 2 && words.length <= 4 && words.every(w => w.length >= 2) && n.length >= 4 && n.length <= 35;
+    // Split lines that contain team separators (&, /, and, vs, +, -)
+    const splitNames = [];
+    lines.forEach(l => {
+      const cleaned = l.replace(/^[\d.\-)\]]+\s*/, '');
+      const parts = cleaned.split(/\s*[&\/\+]\s*|\s+and\s+|\s+vs\.?\s+|\s*[-–—]\s*/i);
+      parts.forEach(p => {
+        const name = p.replace(/[^a-zA-Z\s'-]/g, '').trim();
+        if (name) splitNames.push(name);
       });
+    });
+    const names = splitNames.filter(n => {
+      const words = n.split(/\s+/);
+      return words.length >= 2 && words.length <= 4 && words.every(w => w.length >= 2) && n.length >= 4 && n.length <= 35;
+    });
     if (!names.length) {
       status.innerHTML = '❌ No names found. Try a clearer image with names listed.<br><small style="color:#aaa">Detected: ' + lines.slice(0, 5).join(' | ') + '</small>';
       status.style.color = '#ff6b6b';
