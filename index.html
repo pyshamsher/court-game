@@ -197,7 +197,11 @@
     </select>
     <button onclick="fetchSchedule()" style="background:#0f3460;margin-bottom:12px">🔄 Refresh Schedule</button>
     </div>
-    <button onclick="pastePlayersFromText()" style="background:#0f3460;margin-bottom:8px">📋 Paste Names</button>
+    <button onclick="document.getElementById('pasteBox').style.display=document.getElementById('pasteBox').style.display==='none'?'block':'none'" style="background:#0f3460;margin-bottom:8px">📋 Paste Names</button>
+    <div id="pasteBox" style="display:none;margin-bottom:12px">
+      <textarea id="pasteTextArea" rows="6" placeholder="Paste names here (one per line, or separated by commas, & or 'and')" style="width:100%;padding:10px;border-radius:8px;border:none;background:#0f3460;color:#eee;font-size:14px;resize:vertical"></textarea>
+      <button onclick="addFromPasteBox()" style="margin-top:6px;padding:8px 16px">✅ Add Players</button>
+    </div>
     <label style="background:#0f3460;padding:10px 16px;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600;margin-bottom:12px;display:inline-block">📷 From Screenshot<input type="file" accept="image/*" onchange="scanScreenshotForPlayers(event)" style="display:none"></label>
     <div id="scanPlayerStatus" style="font-size:12px;color:#aaa;margin-bottom:8px"></div>
     <label>Court Numbers (comma-separated, e.g. 3, 5, 7):</label>
@@ -2411,10 +2415,17 @@ function renumberSeeds() {
   document.querySelectorAll('#playerList .player-row .seed-label').forEach((el, i) => el.textContent = (i+1) + '.');
 }
 
-function pastePlayersFromText() {
-  const input = prompt('Paste or type player names (one per line, or separated by commas):');
-  if (!input) return;
+function addFromPasteBox() {
+  const input = document.getElementById('pasteTextArea').value;
+  if (!input.trim()) return;
   addNamesFromText(input);
+  document.getElementById('pasteTextArea').value = '';
+  document.getElementById('pasteBox').style.display = 'none';
+}
+
+function pastePlayersFromText() {
+  document.getElementById('pasteBox').style.display = 'block';
+  document.getElementById('pasteTextArea').focus();
 }
 
 async function scanScreenshotForPlayers(event) {
@@ -2443,9 +2454,10 @@ async function scanScreenshotForPlayers(event) {
     const data = await res.json();
     const raw = data.ParsedResults && data.ParsedResults[0] ? data.ParsedResults[0].ParsedText : '';
     if (!raw) { status.textContent = '❌ Could not read text. Try a clearer image.'; status.style.color = '#ff6b6b'; event.target.value = ''; return; }
-    const edited = prompt('Edit to keep only player names:\n\n' + raw);
-    if (!edited) { status.textContent = ''; event.target.value = ''; return; }
-    addNamesFromText(edited);
+    document.getElementById('pasteBox').style.display = 'block';
+    document.getElementById('pasteTextArea').value = raw;
+    status.textContent = '✅ Text extracted — edit below and tap "Add Players".';
+    status.style.color = '#4ecca3';
   } catch (e) {
     status.textContent = '❌ Error: ' + e.message;
     status.style.color = '#ff6b6b';
