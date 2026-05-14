@@ -2421,12 +2421,29 @@ async function scanScreenshotForPlayers(event) {
   const file = event.target.files[0];
   if (!file) return;
   const status = document.getElementById('scanPlayerStatus');
-  status.textContent = '🔄 Reading image (may take a few seconds)...';
+  status.textContent = '🔄 Reading image...';
   status.style.color = '#aaa';
   try {
-    const { data } = await Tesseract.recognize(file, 'eng');
-    const raw = data.text;
-    const edited = prompt('OCR result — delete junk, keep only names (one per line or comma-separated):\n\n' + raw);
+    // Convert to base64
+    const base64 = await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result.split(',')[1]);
+      reader.readAsDataURL(file);
+    });
+    // Use OCR.space free API
+    const formData = new FormData();
+    formData.append('base64Image', 'data:' + file.type + ';base64,' + base64);
+    formData.append('language', 'eng');
+    formData.append('isOverlayRequired', 'false');
+    const res = await fetch('https://api.ocr.space/parse/image', {
+      method: 'POST',
+      headers: { 'apikey': 'K85403655788957' },
+      body: formData
+    });
+    const data = await res.json();
+    const raw = data.ParsedResults && data.ParsedResults[0] ? data.ParsedResults[0].ParsedText : '';
+    if (!raw) { status.textContent = '❌ Could not read text. Try a clearer image.'; status.style.color = '#ff6b6b'; event.target.value = ''; return; }
+    const edited = prompt('Edit to keep only player names:\n\n' + raw);
     if (!edited) { status.textContent = ''; event.target.value = ''; return; }
     addNamesFromText(edited);
   } catch (e) {
