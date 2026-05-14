@@ -178,21 +178,6 @@
       <select id="roomSignupSheet" style="width:100%;padding:10px;border-radius:8px;border:none;background:#0f3460;color:#eee;font-size:14px;margin-bottom:8px">
         <option value="">-- Select signup sheet --</option>
       </select>
-      <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
-        <select id="roomFormat" style="flex:1;padding:10px;border-radius:8px;border:none;background:#0f3460;color:#eee;font-size:14px">
-          <option value="classic">🏆 King of the Court</option>
-          <option value="dupr">📊 DUPR Recordable</option>
-          <option value="roundrobin">🔄 Round Robin</option>
-          <option value="balancedrr">⚖️ Balanced Round Robin</option>
-          <option value="random">🎲 Random Mix</option>
-          <option value="mixmatch">🔀 Mix & Match</option>
-          <option value="ladder">🪜 Ladder</option>
-          <option value="elimination">💀 Double Elimination</option>
-          <option value="fixed">🤝 Fixed Partners</option>
-        </select>
-        <button onclick="showRoomFormatInfo()" style="margin:0;padding:10px 12px;background:#0f3460;font-size:13px">ℹ️</button>
-      </div>
-      <div id="roomFormatInfo" style="display:none;background:#0f3460;padding:12px;border-radius:8px;margin-bottom:8px;font-size:12px;color:#ccc;line-height:1.6;text-align:left"></div>
       <button onclick="startNewRoom()" style="width:100%;padding:10px;background:#4ecca3;color:#1a1a2e;font-weight:700">▶ Start Game</button>
     </div>
     <button onclick="logout()" style="background:#0f3460;margin-top:12px">🚪 Logout</button>
@@ -1141,9 +1126,8 @@ function loadRooms() {
 
 function startNewRoom() {
   const sheet = document.getElementById('roomSignupSheet').value;
-  const format = document.getElementById('roomFormat').value;
-  const roomId = (sheet || 'manual') + '_' + format;
-  const name = (sheet ? sheet.replace(/-/g, ' ') : 'Manual') + ' — ' + format;
+  const roomId = (sheet || 'manual') + '_game';
+  const name = sheet ? sheet.replace(/-/g, ' ') : 'Manual Game';
   getDb().ref(sessionKey + '/rooms/' + roomId + '/name').set(name).then(() => {
     joinRoom(roomId);
     // Auto-load players from signup sheet if selected
@@ -1156,7 +1140,6 @@ function startNewRoom() {
         const duprs = entries.map(e => e.dupr || e.clubRating || 0);
         renderPlayerList(names, duprs);
         autoAdjustCourts(names.length);
-        document.getElementById('gameFormat').value = format;
       });
     }
   });
