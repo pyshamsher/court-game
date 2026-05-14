@@ -197,7 +197,8 @@
     </select>
     <button onclick="fetchSchedule()" style="background:#0f3460;margin-bottom:12px">🔄 Refresh Schedule</button>
     </div>
-    <button onclick="pastePlayersFromText()" style="background:#0f3460;margin-bottom:12px">📋 Paste Player Names</button>
+    <button onclick="pastePlayersFromText()" style="background:#0f3460;margin-bottom:8px">📋 Paste Names</button>
+    <label style="background:#0f3460;padding:10px 16px;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600;margin-bottom:12px;display:inline-block">📷 From Screenshot<input type="file" accept="image/*" onchange="scanScreenshotForPlayers(event)" style="display:none"></label>
     <div id="scanPlayerStatus" style="font-size:12px;color:#aaa;margin-bottom:8px"></div>
     <label>Court Numbers (comma-separated, e.g. 3, 5, 7):</label>
     <input type="text" id="courtNumbers" value="1, 2" oninput="updateDummyNames()" style="width:200px;padding:8px;border-radius:8px;border:none;background:#0f3460;color:#eee;font-size:14px;margin-bottom:8px">
@@ -2413,8 +2414,32 @@ function renumberSeeds() {
 function pastePlayersFromText() {
   const input = prompt('Paste or type player names (one per line, or separated by commas):');
   if (!input) return;
-  const names = input.split(/[\n,]+/).map(n => n.replace(/^[\d.\-)\]]+\s*/, '').replace(/[^a-zA-Z\s'-]/g, '').trim()).filter(n => n.length >= 2);
-  if (!names.length) return alert('No valid names found.');
+  addNamesFromText(input);
+}
+
+async function scanScreenshotForPlayers(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const status = document.getElementById('scanPlayerStatus');
+  status.textContent = '🔄 Reading image (may take a few seconds)...';
+  status.style.color = '#aaa';
+  try {
+    const { data } = await Tesseract.recognize(file, 'eng');
+    const raw = data.text;
+    const edited = prompt('OCR result — delete junk, keep only names (one per line or comma-separated):\n\n' + raw);
+    if (!edited) { status.textContent = ''; event.target.value = ''; return; }
+    addNamesFromText(edited);
+  } catch (e) {
+    status.textContent = '❌ Error: ' + e.message;
+    status.style.color = '#ff6b6b';
+  }
+  event.target.value = '';
+}
+
+function addNamesFromText(input) {
+  const status = document.getElementById('scanPlayerStatus');
+  const names = input.split(/[\n,&\/\+]+/).map(n => n.replace(/^[\d.\-)\]]+\s*/, '').replace(/[^a-zA-Z\s'-]/g, '').trim()).filter(n => n.length >= 2);
+  if (!names.length) { status.textContent = '❌ No valid names found.'; status.style.color = '#ff6b6b'; return; }
   const existing = getPlayerNames();
   const norm = s => s.toLowerCase().replace(/[^a-z]/g, '');
   const existingSet = new Set(existing.map(norm));
@@ -2423,8 +2448,8 @@ function pastePlayersFromText() {
   const allDuprs = [...getPlayerDuprs(), ...newNames.map(() => 0)];
   renderPlayerList(allNames, allDuprs);
   autoAdjustCourts(allNames.length);
-  document.getElementById('scanPlayerStatus').textContent = `✅ Added ${newNames.length} players.`;
-  document.getElementById('scanPlayerStatus').style.color = '#4ecca3';
+  status.textContent = `✅ Added ${newNames.length} players.`;
+  status.style.color = '#4ecca3';
 }
 
 function addPlayerRow() {
