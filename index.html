@@ -198,7 +198,7 @@
     <button onclick="fetchSchedule()" style="background:#0f3460;margin-bottom:12px">🔄 Refresh Schedule</button>
     </div>
     <button onclick="loadFromSignups()" style="background:#0f3460;margin-bottom:12px">📋 Load from Signups</button>
-    <label style="background:#0f3460;padding:10px 16px;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600;margin-bottom:12px;display:inline-block">📷 Load from Screenshot<input type="file" accept="image/*" onchange="scanScreenshotForPlayers(event)" style="display:none"></label>
+    <button onclick="pastePlayersFromText()" style="background:#0f3460;margin-bottom:12px">📋 Paste Player Names</button>
     <div id="scanPlayerStatus" style="font-size:12px;color:#aaa;margin-bottom:8px"></div>
     <label>Court Numbers (comma-separated, e.g. 3, 5, 7):</label>
     <input type="text" id="courtNumbers" value="1, 2" oninput="updateDummyNames()" style="width:200px;padding:8px;border-radius:8px;border:none;background:#0f3460;color:#eee;font-size:14px;margin-bottom:8px">
@@ -2411,35 +2411,21 @@ function renumberSeeds() {
   document.querySelectorAll('#playerList .player-row .seed-label').forEach((el, i) => el.textContent = (i+1) + '.');
 }
 
-async function scanScreenshotForPlayers(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-  const status = document.getElementById('scanPlayerStatus');
-  status.textContent = '🔄 Reading image...';
-  status.style.color = '#aaa';
-  try {
-    const { data } = await Tesseract.recognize(file, 'eng');
-    // Show all detected text — let user clean it up
-    const raw = data.text.replace(/[^a-zA-Z\n&\/\+\- ]/g, '').split('\n').map(l => l.trim()).filter(l => l.length > 1).join('\n');
-    const edited = prompt('Edit to keep only player names (one per line):\n\n' + raw);
-    if (!edited) { status.textContent = 'Cancelled.'; status.style.color = '#aaa'; event.target.value = ''; return; }
-    const names = edited.split('\n').map(n => n.trim()).filter(n => n.length >= 2);
-    if (!names.length) { status.textContent = '❌ No names entered.'; status.style.color = '#ff6b6b'; event.target.value = ''; return; }
-    const existing = getPlayerNames();
-    const norm = s => s.toLowerCase().replace(/[^a-z]/g, '');
-    const existingSet = new Set(existing.map(norm));
-    const newNames = names.filter(n => !existingSet.has(norm(n)));
-    const allNames = [...existing, ...newNames];
-    const allDuprs = [...getPlayerDuprs(), ...newNames.map(() => 0)];
-    renderPlayerList(allNames, allDuprs);
-    autoAdjustCourts(allNames.length);
-    status.textContent = `✅ Added ${newNames.length} players.`;
-    status.style.color = '#4ecca3';
-  } catch (e) {
-    status.textContent = '❌ Error: ' + e.message;
-    status.style.color = '#ff6b6b';
-  }
-  event.target.value = '';
+function pastePlayersFromText() {
+  const input = prompt('Paste or type player names (one per line, or separated by commas):');
+  if (!input) return;
+  const names = input.split(/[\n,]+/).map(n => n.replace(/^[\d.\-)\]]+\s*/, '').replace(/[^a-zA-Z\s'-]/g, '').trim()).filter(n => n.length >= 2);
+  if (!names.length) return alert('No valid names found.');
+  const existing = getPlayerNames();
+  const norm = s => s.toLowerCase().replace(/[^a-z]/g, '');
+  const existingSet = new Set(existing.map(norm));
+  const newNames = names.filter(n => !existingSet.has(norm(n)));
+  const allNames = [...existing, ...newNames];
+  const allDuprs = [...getPlayerDuprs(), ...newNames.map(() => 0)];
+  renderPlayerList(allNames, allDuprs);
+  autoAdjustCourts(allNames.length);
+  document.getElementById('scanPlayerStatus').textContent = `✅ Added ${newNames.length} players.`;
+  document.getElementById('scanPlayerStatus').style.color = '#4ecca3';
 }
 
 function addPlayerRow() {
