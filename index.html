@@ -1271,6 +1271,11 @@ function generateMatchups(format) {
   const maxOnCourt = numCourts * ppc;
   let active, bye = [];
 
+  // Fixed partners handles its own bye at team level — skip shared bye logic
+  if (format === 'fixed') {
+    active = [...players];
+    state.bye = [];
+  } else {
   // Fair bye rotation
   const playable = Math.min(n, maxOnCourt);
   const needed = playable - (playable % ppc);
@@ -1293,6 +1298,7 @@ function generateMatchups(format) {
   }
 
   state.bye = bye.map(p => p.name);
+  } // end non-fixed bye logic
 
   // Generate court assignments based on format
   const courts = [];
