@@ -1384,7 +1384,8 @@ function generateMatchups(format) {
       if (used.has(i) || used.has(j)) continue;
       if (courts.length >= maxCourts) break;
       if (lastByeTeams.has(i) || lastByeTeams.has(j)) {
-        courts.push([...teams[i].players, ...teams[j].players]);
+        // Court positions: [0]+[3]=Top team, [1]+[2]=Bottom team
+        courts.push([teams[i].players[0], teams[j].players[0], teams[j].players[1], teams[i].players[1]]);
         state.playedMatchups.push([i, j]);
         used.add(i); used.add(j);
       }
@@ -1393,7 +1394,7 @@ function generateMatchups(format) {
     for (const [i, j] of roundMatchups) {
       if (used.has(i) || used.has(j)) continue;
       if (courts.length >= maxCourts) break;
-      courts.push([...teams[i].players, ...teams[j].players]);
+      courts.push([teams[i].players[0], teams[j].players[0], teams[j].players[1], teams[i].players[1]]);
       state.playedMatchups.push([i, j]);
       used.add(i); used.add(j);
     }
