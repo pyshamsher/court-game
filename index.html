@@ -221,7 +221,7 @@
       <div id="duprStatus" style="font-size:13px;color:#aaa;white-space:pre-wrap"></div>
     </div>
     <div style="display:flex;gap:8px;margin:10px 0;align-items:center">
-      <select id="gameFormat" style="flex:1;padding:10px;border-radius:8px;border:none;background:#0f3460;color:#eee;font-size:14px">
+      <select id="gameFormat" onchange="previewTeams()" style="flex:1;padding:10px;border-radius:8px;border:none;background:#0f3460;color:#eee;font-size:14px">
         <option value="classic">🏆 King of the Court</option>
         <option value="dupr">📊 DUPR Recordable</option>
         <option value="roundrobin">🔄 Round Robin</option>
@@ -235,6 +235,7 @@
       <button onclick="showFormatInfo()" style="margin:0;padding:10px 12px;background:#0f3460;font-size:13px">ℹ️</button>
     </div>
     <div id="formatInfo" style="display:none;background:#0f3460;padding:12px;border-radius:8px;margin-bottom:10px;font-size:12px;color:#ccc;line-height:1.6"></div>
+    <div id="teamPreview" style="display:none;background:#0f3460;padding:12px;border-radius:8px;margin-bottom:10px"></div>
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
       <label style="font-size:13px;color:#aaa;margin:0">Pairing:</label>
       <select id="pairingMode" style="flex:1;padding:8px;border-radius:8px;border:none;background:#0f3460;color:#eee;font-size:13px">
@@ -2413,6 +2414,24 @@ function jumpPlayer(idx) {
 
 function renumberSeeds() {
   document.querySelectorAll('#playerList .player-row .seed-label').forEach((el, i) => el.textContent = (i+1) + '.');
+}
+
+function previewTeams() {
+  const el = document.getElementById('teamPreview');
+  const format = document.getElementById('gameFormat').value;
+  if (format !== 'fixed') { el.style.display = 'none'; return; }
+  const names = getPlayerNames();
+  if (names.length < 2) { el.style.display = 'none'; return; }
+  let html = '<h4 style="color:#4ecca3;margin:0 0 8px;font-size:13px">🤝 Teams (paired in list order):</h4>';
+  for (let i = 0; i < names.length; i += 2) {
+    const p1 = names[i];
+    const p2 = names[i + 1] || '(needs partner)';
+    html += `<div style="padding:4px 8px;font-size:14px;color:#eee">Team ${Math.floor(i/2)+1}: <strong>${p1}</strong> & <strong>${p2}</strong></div>`;
+  }
+  if (names.length % 2) html += `<div style="padding:4px 8px;font-size:12px;color:#f0a500">⚠️ Odd number of players — last player needs a partner</div>`;
+  html += `<div style="padding:4px 8px;font-size:11px;color:#888;margin-top:6px">Reorder players above to change teams (1+2, 3+4, etc.)</div>`;
+  el.innerHTML = html;
+  el.style.display = 'block';
 }
 
 function addFromPasteBox() {
