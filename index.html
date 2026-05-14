@@ -1371,33 +1371,47 @@ function generateMatchups(format) {
     // Pick matchups for this round (avoid repeats)
     state.playedMatchups = state.playedMatchups || [];
     const available = matchupList.filter(m => !state.playedMatchups.some(p => p[0] === m[0] && p[1] === m[1]));
-    const roundMatchups = available.length ? available : matchupList;
+    let roundMatchups = available.length ? [...available] : [...matchupList];
     if (!available.length) state.playedMatchups = [];
+    // Shuffle to avoid sequential bias
+    roundMatchups.sort(() => Math.random() - 0.5);
     // Assign to courts — use as many courts as needed (up to teams/2)
     const maxCourts = Math.floor(teams.length / 2);
     const lastByeNames = new Set(state.bye || []);
     const lastByeTeams = new Set(teams.map((t, idx) => t.players.some(p => lastByeNames.has(p.name)) ? idx : -1).filter(i => i >= 0));
-    const used = new Set();
-    const courts = [];
-    // First pass: ensure last-round bye teams get to play
-    for (const [i, j] of roundMatchups) {
-      if (used.has(i) || used.has(j)) continue;
-      if (courts.length >= maxCourts) break;
-      if (lastByeTeams.has(i) || lastByeTeams.has(j)) {
-        // Court positions: [0]+[3]=Top team, [1]+[2]=Bottom team
+    let used = new Set();
+    let courts = [];
+    let bestCourts = [], bestUsed = new Set(), bestMatchups = [];
+    // Try multiple shuffles to maximize courts filled
+    for (let attempt = 0; attempt < 20; attempt++) {
+      used = new Set();
+      courts = [];
+      const tryMatchups = [];
+      const shuffled = [...roundMatchups].sort(() => Math.random() - 0.5);
+      // First pass: bye teams
+      for (const [i, j] of shuffled) {
+        if (used.has(i) || used.has(j)) continue;
+        if (courts.length >= maxCourts) break;
+        if (lastByeTeams.size && (lastByeTeams.has(i) || lastByeTeams.has(j))) {
+          courts.push([teams[i].players[0], teams[j].players[0], teams[j].players[1], teams[i].players[1]]);
+          tryMatchups.push([i, j]);
+          used.add(i); used.add(j);
+        }
+      }
+      // Second pass: fill remaining
+      for (const [i, j] of shuffled) {
+        if (used.has(i) || used.has(j)) continue;
+        if (courts.length >= maxCourts) break;
         courts.push([teams[i].players[0], teams[j].players[0], teams[j].players[1], teams[i].players[1]]);
-        state.playedMatchups.push([i, j]);
+        tryMatchups.push([i, j]);
         used.add(i); used.add(j);
       }
-    }
-    // Second pass: fill remaining courts
-    for (const [i, j] of roundMatchups) {
-      if (used.has(i) || used.has(j)) continue;
+      if (courts.length > bestCourts.length) { bestCourts = courts; bestUsed = used; bestMatchups = tryMatchups; }
       if (courts.length >= maxCourts) break;
-      courts.push([teams[i].players[0], teams[j].players[0], teams[j].players[1], teams[i].players[1]]);
-      state.playedMatchups.push([i, j]);
-      used.add(i); used.add(j);
     }
+    courts = bestCourts;
+    used = bestUsed;
+    bestMatchups.forEach(m => state.playedMatchups.push(m));
     // Teams not playing this round are bye
     const playingTeams = new Set([...used]);
     const byeTeams = teams.filter((t, idx) => !playingTeams.has(idx));
