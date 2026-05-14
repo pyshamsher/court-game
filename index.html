@@ -2455,7 +2455,7 @@ async function scanScreenshotForPlayers(event) {
 
 function addNamesFromText(input) {
   const status = document.getElementById('scanPlayerStatus');
-  const names = input.split(/[\n,&\/\+]+/).map(n => n.replace(/^[\d.\-)\]]+\s*/, '').replace(/[^a-zA-Z\s'-]/g, '').trim()).filter(n => n.length >= 2);
+  const names = input.split(/[\n,&\/\+]+|\s+and\s+/i).map(n => n.replace(/^[\d.\-)\]]+\s*/, '').replace(/[^a-zA-Z\s'-]/g, '').trim()).filter(n => n.length >= 2);
   if (!names.length) { status.textContent = '❌ No valid names found.'; status.style.color = '#ff6b6b'; return; }
   const existing = getPlayerNames();
   const norm = s => s.toLowerCase().replace(/[^a-z]/g, '');
