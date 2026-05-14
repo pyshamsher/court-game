@@ -2419,50 +2419,22 @@ async function scanScreenshotForPlayers(event) {
   status.style.color = '#aaa';
   try {
     const { data } = await Tesseract.recognize(file, 'eng');
-    const lines = data.text.split('\n').map(l => l.trim()).filter(l => l.length > 2 && /[a-zA-Z]/.test(l));
-    // Split lines that contain team separators (&, /, and, vs, +, -)
-    const splitNames = [];
-    lines.forEach(l => {
-      const cleaned = l.replace(/^[\d.\-)\]]+\s*/, '');
-      const parts = cleaned.split(/\s*[&\/\+]\s*|\s+and\s+|\s+vs\.?\s+|\s*[-–—]\s*/i);
-      parts.forEach(p => {
-        const name = p.replace(/[^a-zA-Z\s'-]/g, '').trim();
-        if (name) splitNames.push(name);
-      });
-    });
-    const skipWords = new Set(['teams','team','court','courts','round','vs','and','the','players','game','match','today','yesterday','online','offline','typing','delivered','read','sent','pm','am','group','info','media','links','docs','search','message','messages','chat','reply','forward','delete','copy','edit','admin','settings','mute','block','report','call','video','audio','photo','camera','gallery','file','contact','location','document','poll','status','whatsapp','imessage','telegram','signal']);
-    const names = splitNames.filter(n => {
-      const words = n.split(/\s+/);
-      if (words.length < 1 || words.length > 3) return false;
-      if (n.length < 3 || n.length > 25) return false;
-      if (skipWords.has(n.toLowerCase())) return false;
-      // Must start with uppercase (proper name) or be all alpha
-      if (!/^[A-Z]/.test(n) && words.length === 1) return false;
-      // Reject if contains numbers or too many special chars
-      if (/\d/.test(n)) return false;
-      // Each word must be 2+ chars
-      if (!words.every(w => w.length >= 2 && /^[a-zA-Z'-]+$/.test(w))) return false;
-      return true;
-    });
-    if (!names.length) {
-      status.innerHTML = '❌ No names found. Try a clearer image with names listed.<br><small style="color:#aaa">Detected: ' + lines.slice(0, 5).join(' | ') + '</small>';
-      status.style.color = '#ff6b6b';
-    } else {
-      const existing = getPlayerNames();
-      const norm = s => s.toLowerCase().replace(/[^a-z]/g, '');
-      const existingSet = new Set(existing.map(norm));
-      const newNames = names.filter(n => !existingSet.has(norm(n)));
-      // Show for confirmation
-      const confirmed = prompt('Found these names (edit or remove any wrong ones):\n\n' + newNames.join('\n') + '\n\nPress OK to add, or edit the list:');
-      if (confirmed === null) { status.textContent = 'Cancelled.'; status.style.color = '#aaa'; event.target.value = ''; return; }
-      const finalNames = (confirmed || newNames.join('\n')).split('\n').map(n => n.trim()).filter(n => n.length >= 2);
-      const allNames = [...existing, ...finalNames];
-      const allDuprs = [...getPlayerDuprs(), ...finalNames.map(() => 0)];
-      renderPlayerList(allNames, allDuprs);
-      autoAdjustCourts(allNames.length);
-      status.textContent = `✅ Added ${finalNames.length} players.`;
-      status.style.color = '#4ecca3';
-    }
+    // Show all detected text — let user clean it up
+    const raw = data.text.replace(/[^a-zA-Z\n&\/\+\- ]/g, '').split('\n').map(l => l.trim()).filter(l => l.length > 1).join('\n');
+    const edited = prompt('Edit to keep only player names (one per line):\n\n' + raw);
+    if (!edited) { status.textContent = 'Cancelled.'; status.style.color = '#aaa'; event.target.value = ''; return; }
+    const names = edited.split('\n').map(n => n.trim()).filter(n => n.length >= 2);
+    if (!names.length) { status.textContent = '❌ No names entered.'; status.style.color = '#ff6b6b'; event.target.value = ''; return; }
+    const existing = getPlayerNames();
+    const norm = s => s.toLowerCase().replace(/[^a-z]/g, '');
+    const existingSet = new Set(existing.map(norm));
+    const newNames = names.filter(n => !existingSet.has(norm(n)));
+    const allNames = [...existing, ...newNames];
+    const allDuprs = [...getPlayerDuprs(), ...newNames.map(() => 0)];
+    renderPlayerList(allNames, allDuprs);
+    autoAdjustCourts(allNames.length);
+    status.textContent = `✅ Added ${newNames.length} players.`;
+    status.style.color = '#4ecca3';
   } catch (e) {
     status.textContent = '❌ Error: ' + e.message;
     status.style.color = '#ff6b6b';
