@@ -1346,10 +1346,11 @@ function generateMatchups(format) {
     for (let i = 0; i < sorted.length; i += ppc) courts.push(sorted.slice(i, i + ppc));
   } else if (format === 'fixed') {
     // Fixed partners: pair in order, rotate opponents
+    // Use ALL players (not just active) — bye handled at team level
     if (!state.teams) {
       state.teams = [];
-      for (let i = 0; i < active.length; i += 2) {
-        if (i + 1 < active.length) state.teams.push({ players: [active[i], active[i+1]], wins: 0, losses: 0 });
+      for (let i = 0; i < players.length; i += 2) {
+        if (i + 1 < players.length) state.teams.push({ players: [players[i], players[i+1]], wins: 0, losses: 0 });
       }
       state.fixedRound = 0;
     }
@@ -1364,9 +1365,10 @@ function generateMatchups(format) {
     // Pick matchups for this round (avoid repeats)
     state.playedMatchups = state.playedMatchups || [];
     const available = matchupList.filter(m => !state.playedMatchups.some(p => p[0] === m[0] && p[1] === m[1]));
-    const roundMatchups = available.length ? available : matchupList; // reset if all played
+    const roundMatchups = available.length ? available : matchupList;
     if (!available.length) state.playedMatchups = [];
-    // Assign to courts — prioritize teams that had bye last round
+    // Assign to courts — use as many courts as needed (up to teams/2)
+    const maxCourts = Math.floor(teams.length / 2);
     const lastByeNames = new Set(state.bye || []);
     const lastByeTeams = new Set(teams.map((t, idx) => t.players.some(p => lastByeNames.has(p.name)) ? idx : -1).filter(i => i >= 0));
     const used = new Set();
@@ -1374,7 +1376,7 @@ function generateMatchups(format) {
     // First pass: ensure last-round bye teams get to play
     for (const [i, j] of roundMatchups) {
       if (used.has(i) || used.has(j)) continue;
-      if (courts.length >= numCourts) break;
+      if (courts.length >= maxCourts) break;
       if (lastByeTeams.has(i) || lastByeTeams.has(j)) {
         courts.push([...teams[i].players, ...teams[j].players]);
         state.playedMatchups.push([i, j]);
@@ -1384,7 +1386,7 @@ function generateMatchups(format) {
     // Second pass: fill remaining courts
     for (const [i, j] of roundMatchups) {
       if (used.has(i) || used.has(j)) continue;
-      if (courts.length >= numCourts) break;
+      if (courts.length >= maxCourts) break;
       courts.push([...teams[i].players, ...teams[j].players]);
       state.playedMatchups.push([i, j]);
       used.add(i); used.add(j);
