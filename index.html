@@ -2401,9 +2401,10 @@ async function scanScreenshotForPlayers(event) {
         if (name) splitNames.push(name);
       });
     });
+    const skipWords = new Set(['teams','team','court','courts','round','vs','and','the','players','game','match']);
     const names = splitNames.filter(n => {
       const words = n.split(/\s+/);
-      return words.length >= 2 && words.length <= 4 && words.every(w => w.length >= 2) && n.length >= 4 && n.length <= 35;
+      return words.length >= 1 && words.length <= 4 && words.every(w => w.length >= 2) && n.length >= 3 && n.length <= 35 && !skipWords.has(n.toLowerCase());
     });
     if (!names.length) {
       status.innerHTML = '❌ No names found. Try a clearer image with names listed.<br><small style="color:#aaa">Detected: ' + lines.slice(0, 5).join(' | ') + '</small>';
