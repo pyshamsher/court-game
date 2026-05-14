@@ -241,7 +241,6 @@
       </select>
     </div>
     <button onclick="startGame()" style="width:100%;margin:10px 0">▶ Start Game</button>
-    <button onclick="backToRooms()" style="background:#0f3460">← Groups</button>
     <button onclick="logout()" style="background:#0f3460">🚪 Logout</button>
   </div>
 </div>
@@ -1049,10 +1048,8 @@ function logout() {
 function backToRooms() {
   if (db) db.off();
   currentRoom = null;
-  document.getElementById('setup').style.display = 'none';
-  document.getElementById('game').style.display = 'none';
-  document.getElementById('roomSelect').style.display = 'block';
-  loadRooms();
+  sessionStorage.removeItem('pb_session');
+  location.reload();
 }
 
 const FORMAT_INFO = {
@@ -1089,10 +1086,36 @@ let currentRoom = null;
 
 function initApp() {
   getDb();
-  // Show room selector
-  document.getElementById('roomSelect').style.display = 'block';
+  // Skip room select — auto-join default room or active game
+  document.getElementById('roomSelect').style.display = 'none';
   document.getElementById('syncStatus').textContent = '';
-  loadRooms();
+  // Check for active games first
+  getDb().ref(sessionKey + '/rooms').once('value', snap => {
+    const rooms = snap.val() || {};
+    const active = Object.entries(rooms).filter(([id, r]) => r.game && r.game.players && r.game.players.length);
+    if (active.length) {
+      // Join the first active game
+      joinRoom(active[0][0]);
+    } else {
+      // No active game — create/join default room and show setup
+      joinRoom('default_game');
+    }
+  });
+  // Load signup sheets into the setup screen dropdown
+  loadSignupSheets();
+}
+
+function loadSignupSheets() {
+  getDb().ref('signups').once('value', snap => {
+    const data = snap.val() || {};
+    const sel = document.getElementById('roomSignupSheet');
+    if (!sel) return;
+    sel.innerHTML = '<option value="">-- No signup sheet (manual) --</option>';
+    Object.entries(data).filter(([k, v]) => v.active).forEach(([date, v]) => {
+      const count = v.players ? Object.keys(v.players).length : 0;
+      sel.innerHTML += `<option value="${date}">${date.replace(/-/g, ' ')} (${count} players)</option>`;
+    });
+  });
 }
 
 function loadRooms() {
