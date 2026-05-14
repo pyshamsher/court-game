@@ -213,6 +213,8 @@
     <button onclick="fetchSchedule()" style="background:#0f3460;margin-bottom:12px">🔄 Refresh Schedule</button>
     </div>
     <button onclick="loadFromSignups()" style="background:#0f3460;margin-bottom:12px">📋 Load from Signups</button>
+    <label style="background:#0f3460;padding:10px 16px;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600;margin-bottom:12px;display:inline-block">📷 Load from Screenshot<input type="file" accept="image/*" onchange="scanScreenshotForPlayers(event)" style="display:none"></label>
+    <div id="scanPlayerStatus" style="font-size:12px;color:#aaa;margin-bottom:8px"></div>
     <label>Court Numbers (comma-separated, e.g. 3, 5, 7):</label>
     <input type="text" id="courtNumbers" value="1, 2" oninput="updateDummyNames()" style="width:200px;padding:8px;border-radius:8px;border:none;background:#0f3460;color:#eee;font-size:14px;margin-bottom:8px">
     <label>Players per court:</label>
@@ -2378,6 +2380,42 @@ function jumpPlayer(idx) {
 
 function renumberSeeds() {
   document.querySelectorAll('#playerList .player-row .seed-label').forEach((el, i) => el.textContent = (i+1) + '.');
+}
+
+async function scanScreenshotForPlayers(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const status = document.getElementById('scanPlayerStatus');
+  status.textContent = '🔄 Reading image...';
+  status.style.color = '#aaa';
+  try {
+    const { data } = await Tesseract.recognize(file, 'eng');
+    const lines = data.text.split('\n').map(l => l.trim()).filter(l => l.length > 2 && /[a-zA-Z]/.test(l));
+    const names = lines.map(l => l.replace(/^[\d.\-)\]]+\s*/, '').replace(/[^a-zA-Z\s'-]/g, '').trim())
+      .filter(n => {
+        const words = n.split(/\s+/);
+        return words.length >= 2 && words.length <= 4 && words.every(w => w.length >= 2) && n.length >= 4 && n.length <= 35;
+      });
+    if (!names.length) {
+      status.innerHTML = '❌ No names found. Try a clearer image with names listed.<br><small style="color:#aaa">Detected: ' + lines.slice(0, 5).join(' | ') + '</small>';
+      status.style.color = '#ff6b6b';
+    } else {
+      const existing = getPlayerNames();
+      const norm = s => s.toLowerCase().replace(/[^a-z]/g, '');
+      const existingSet = new Set(existing.map(norm));
+      const newNames = names.filter(n => !existingSet.has(norm(n)));
+      const allNames = [...existing, ...newNames];
+      const allDuprs = [...getPlayerDuprs(), ...newNames.map(() => 0)];
+      renderPlayerList(allNames, allDuprs);
+      autoAdjustCourts(allNames.length);
+      status.textContent = `✅ Found ${names.length} names, added ${newNames.length} new players.`;
+      status.style.color = '#4ecca3';
+    }
+  } catch (e) {
+    status.textContent = '❌ Error: ' + e.message;
+    status.style.color = '#ff6b6b';
+  }
+  event.target.value = '';
 }
 
 function addPlayerRow() {
